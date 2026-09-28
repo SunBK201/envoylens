@@ -226,5 +226,9 @@
   "Dynamic filter {0} uses ECDS; only subscription details are currently available.": "动态过滤器 {0} 使用 ECDS，当前仅保留订阅详情。",
   "Listener {0} uses the matcher API; inspect details for the actual matching rules.": "Listener {0} 使用 matcher API，请在详情查看实际匹配规则。",
   "Warming / draining resources describe lifecycle state and may not accept new requests.": "warming / draining 资源仅用于观察生命周期，不代表当前可接收新请求的配置。",
-  "No drawable Listener, Route, or Cluster found; inspect the full raw configuration.": "配置中没有可绘制的 Listener、Route 或 Cluster；可查看完整原始配置。"
+  "No drawable Listener, Route, or Cluster found; inspect the full raw configuration.": "配置中没有可绘制的 Listener、Route 或 Cluster；可查看完整原始配置。",
+  "Not saved in this browser": "未保存到此浏览器",
+  "Configuration parsed, but browser storage is full. Export your configuration before removing unused snapshots.": "配置已解析，但浏览器存储空间不足。请先导出配置，再删除不需要的快照。",
+  "Configuration parsed, but browser storage is disabled. Check this site's storage permissions.": "配置已解析，但浏览器禁用了存储。请检查此站点的存储权限。",
+  "Configuration parsed, but saving failed ({0}). It remains available until you close or reload this page.": "配置已解析，但保存失败（{0}）。关闭或刷新页面前仍可使用。"
 }

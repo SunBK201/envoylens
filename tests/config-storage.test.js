@@ -49,3 +49,49 @@ test("stores large snapshots without localStorage size limits and never polling 
   assert.equal(saved.auto, undefined);
   await clearLastConfig();
 });
+
+test("unavailable storage rejects and does not block later saves", async () => {
+  const original = globalThis.indexedDB;
+  try {
+    globalThis.indexedDB = undefined;
+    await assert.rejects(saveLastConfig({ text: "blocked" }), {
+      name: "NotAllowedError",
+    });
+  } finally {
+    globalThis.indexedDB = original;
+  }
+  await saveLastConfig({ text: "recovered", source: "test" });
+  assert.equal((await readLastConfig()).text, "recovered");
+});
+
+test("synchronous write failure rejects without hanging the storage queue", async () => {
+  await assert.rejects(saveLastConfig({ text: () => {} }), {
+    name: "DataCloneError",
+  });
+  await saveLastConfig({ text: "after-failure", source: "test" });
+  assert.equal((await readLastConfig()).text, "after-failure");
+});
+
+test("storage errors distinguish quota, permissions and unexpected failures", async () => {
+  const { configStorageError } = await import("../src/config-storage.js");
+  assert.match(
+    configStorageError({ name: "QuotaExceededError" }),
+    /storage is full/,
+  );
+  assert.match(
+    configStorageError({ name: "SecurityError" }),
+    /storage is disabled/,
+  );
+  assert.match(
+    configStorageError({ name: "NotAllowedError" }),
+    /storage is disabled/,
+  );
+  assert.match(
+    configStorageError({ name: "AbortError" }),
+    /saving failed \(AbortError\)/,
+  );
+  assert.doesNotMatch(
+    configStorageError(new TypeError("failure")),
+    /storage is full/,
+  );
+});

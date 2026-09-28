@@ -58,6 +58,7 @@ import JsonCode from "./JsonCode";
 import ResizableInspector from "./ResizableInspector";
 import {
   readLastConfig,
+  configStorageError,
   saveConfig,
   readConfigLibrary,
   activateConfig,
@@ -326,14 +327,10 @@ function App() {
 
           setStorageMessage("Saved in this browser");
         })
-        .catch(() => {
+        .catch((error) => {
           if (version === storageVersion.current) {
-            setStorageMessage(
-              "Save failed: browser storage is full or unavailable",
-            );
-            setError(
-              "Configuration parsed, but browser storage is full or unavailable.",
-            );
+            setStorageMessage("Not saved in this browser");
+            setError(configStorageError(error));
           }
         });
     }

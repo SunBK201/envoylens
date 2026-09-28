@@ -118,3 +118,31 @@ test("editing the active config updates the restored snapshot", async () => {
   assert.equal((await readLastConfig()).text, "new");
   assert.equal((await readLastConfig()).id, result.item.id);
 });
+
+test("HTTP origins without randomUUID can save, update and restore snapshots", async () => {
+  const original = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+  const getRandomValues = globalThis.crypto.getRandomValues.bind(
+    globalThis.crypto,
+  );
+  Object.defineProperty(globalThis, "crypto", {
+    configurable: true,
+    value: { getRandomValues },
+  });
+  try {
+    const first = await saveConfig({ text: "http-one", source: "http.json" });
+    const second = await saveConfig({ text: "http-two", source: "http2.json" });
+    assert.match(
+      first.item.id,
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    assert.notEqual(first.item.id, second.item.id);
+    await saveConfig({ ...first.item, text: "http-updated" });
+    assert.equal((await readLastConfig()).text, "http-updated");
+    assert.equal((await readLastConfig()).id, first.item.id);
+    assert(
+      (await readConfigLibrary()).some((item) => item.id === second.item.id),
+    );
+  } finally {
+    Object.defineProperty(globalThis, "crypto", original);
+  }
+});
