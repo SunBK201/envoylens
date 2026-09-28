@@ -166,6 +166,7 @@
   "Route configuration": "路由配置",
   "Route name": "路由名称",
   "Timeout": "超时",
+  "Not configured": "未配置",
   "Idle timeout": "空闲超时",
   "Delay injection": "延迟注入",
   "Fault injection": "故障注入",

@@ -163,8 +163,7 @@ export function nodeFields(n) {
     case "route":
       match(d.match || {});
       if (d.route) {
-        target(d.route);
-        add("timeout", d.route.timeout);
+        add("timeout", d.route.timeout ?? translateUI("Not configured"));
         add("prefix_rewrite", get(d.route, "prefix_rewrite"));
       }
       if (get(d, "direct_response")) {

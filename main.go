@@ -44,7 +44,7 @@ func main() {
 		log.Fatal(err)
 	}
 	addr = net.JoinHostPort(host, fmt.Sprint(n))
-	server := &http.Server{Addr: addr, Handler: newHandler(frontend, host), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 * 1024}
+	server := &http.Server{Addr: addr, Handler: newHandler(frontend), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 32 * 1024}
 	log.Printf("EnvoyLens: http://%s", addr)
 	log.Fatal(server.ListenAndServe())
 }
@@ -73,50 +73,12 @@ func fail(w http.ResponseWriter, status int, message string) {
 	jsonResponse(w, status, map[string]string{"error": message})
 }
 
-func allowedHost(host string, bindHosts []string) bool {
-	if host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]" {
-		return true
-	}
-	for _, bind := range bindHosts {
-		if bind == host {
-			return true
-		}
-		if bind == "" || bind == "0.0.0.0" || bind == "::" {
-			// Wildcard binding permits direct IP access, not arbitrary DNS hosts.
-			if net.ParseIP(host) != nil {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func newHandler(frontend fs.FS, bindHosts ...string) http.Handler {
+func newHandler(frontend fs.FS) http.Handler {
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(_ *http.Request, _ []*http.Request) error { return fmt.Errorf("Admin redirects are not allowed") }}
 	files := http.FileServer(http.FS(frontend))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api" && !strings.HasPrefix(r.URL.Path, "/api/") {
 			files.ServeHTTP(w, r)
-			return
-		}
-		host := r.Host
-		if h, _, err := net.SplitHostPort(host); err == nil {
-			host = h
-		}
-		if !allowedHost(host, bindHosts) {
-			fail(w, 403, "Request host does not match the listening address")
-			return
-		}
-		scheme := "http"
-		if r.TLS != nil {
-			scheme = "https"
-		}
-		if origin := r.Header.Get("Origin"); origin != "" && origin != scheme+"://"+r.Host {
-			fail(w, 403, "Cross-origin requests are not allowed")
-			return
-		}
-		if r.Header.Get("X-EnvoyLens") != "1" {
-			fail(w, 403, "Missing request identifier")
 			return
 		}
 		if r.URL.Path != "/api/config" {

@@ -15,6 +15,7 @@ import React, {
 import { createRoot } from "react-dom/client";
 import {
   Network,
+  LayoutGrid,
   Upload,
   FileCode2,
   FolderCog,
@@ -32,6 +33,7 @@ import {
   Copy,
   Check,
   GitBranch,
+  List,
   PanelLeftClose,
   ArrowDownAZ,
   ArrowUpAZ,
@@ -68,12 +70,12 @@ import {
 const meta = {
   listener: ["Listener", "#6f9466"],
   listener_filter: ["Listener filter", "#9a9870"],
-  filter_chain: ["Filter chain", "#a78b62"],
-  match: ["Match", "#c29132"],
-  network_filter: ["Network filter", "#0f766e"],
-  http_filter: ["HTTP filter", "#749646"],
+  filter_chain: ["Filter Chain", "#a78b62"],
+  match: ["Filter Chain Match", "#c29132"],
+  network_filter: ["Network Filter", "#0f766e"],
+  http_filter: ["HTTP Filter", "#749646"],
   route_config: ["Route config", "#cc7d44"],
-  virtual_host: ["Virtual host", "#c09249"],
+  virtual_host: ["VirtualHost", "#c09249"],
   route: ["Route", "#d38a36"],
   cluster: ["Cluster", "#be185d"],
   endpoint: ["Endpoint", "#a38369"],
@@ -116,10 +118,10 @@ function App() {
   }, [theme]);
   const [model, setModel] = useState(() => parseConfig(sample)),
     [source, setSource] = useState("Demo configuration"),
-    [text, setText] = useState(sample),
+    [text, setText] = useState(""),
     [modal, setModal] = useState(false),
     [tab, setTab] = useState("paste"),
-    [addressValue, setAddress] = useState("http://127.0.0.1:9901"),
+    [addressValue, setAddress] = useState("http://127.0.0.1:15000"),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [selected, setSelected] = useState(null),
@@ -303,7 +305,6 @@ function App() {
     setViewReady(true);
     setError("");
     setModal(false);
-    setText(content);
     const savedAt = options.savedAt || new Date().toISOString();
     setUpdated(new Date(savedAt).toLocaleTimeString("zh-CN"));
     if (!options.restore) {
@@ -675,14 +676,14 @@ function App() {
                     className={view === "graph" ? "active" : ""}
                     onClick={() => setView("graph")}
                   >
-                    <Network size={15} />
+                    <GitBranch size={15} aria-hidden="true" />
                     {t("Graph")}
                   </button>
                   <button
                     className={view === "list" ? "active" : ""}
                     onClick={() => setView("list")}
                   >
-                    <Layers size={15} />
+                    <List size={15} aria-hidden="true" />
                     {t("Resources")}
                   </button>
                   <button
@@ -693,16 +694,6 @@ function App() {
                     {t("Full configuration")}
                   </button>
                 </div>
-                {selected && (
-                  <button
-                    className="details-toggle"
-                    aria-expanded={detailsOpen}
-                    onClick={() => setDetailsOpen(!detailsOpen)}
-                    title={nodeLabel(selected)}
-                  >
-                    {detailsOpen ? t("Hide details") : t("Show details")}
-                  </button>
-                )}
                 <div className="search">
                   <Search size={15} />
                   <input
@@ -721,99 +712,18 @@ function App() {
                     </button>
                   )}
                 </div>
+                {selected && (
+                  <button
+                    className="details-toggle"
+                    aria-expanded={detailsOpen}
+                    onClick={() => setDetailsOpen(!detailsOpen)}
+                    title={nodeLabel(selected)}
+                  >
+                    {detailsOpen ? t("Hide details") : t("Show details")}
+                  </button>
+                )}
               </div>
               <div className="source-actions">
-                {library.length > 0 && (
-                  <select
-                    className="saved-config-switch"
-                    aria-label={t("Switch configuration")}
-                    title={
-                      library.find((item) => item.id === activeConfigId)
-                        ?.name || t("Switch configuration")
-                    }
-                    value={activeConfigId}
-                    onChange={(event) => switchConfig(event.target.value)}
-                  >
-                    <option value="" disabled>
-                      {t("Select a saved configuration")}
-                    </option>
-                    {library.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <button
-                  className="language-toggle"
-                  title={t("Change language")}
-                  aria-label={t("Change language")}
-                  onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
-                >
-                  {language === "zh" ? "EN" : t("Chinese")}
-                </button>
-                <button
-                  className="theme-toggle"
-                  aria-label={t("Appearance: {0}", [
-                    t(
-                      theme === "system"
-                        ? "System; switch to light"
-                        : theme === "light"
-                          ? "Light; switch to dark"
-                          : "Dark; switch to system",
-                    ),
-                  ])}
-                  title={t("Current: {0}; switch to {1}", [
-                    t(
-                      theme === "system"
-                        ? "System"
-                        : theme === "light"
-                          ? "Light"
-                          : "Dark",
-                    ),
-                    t(
-                      theme === "system"
-                        ? "Light"
-                        : theme === "light"
-                          ? "Dark"
-                          : "System",
-                    ),
-                  ])}
-                  onClick={() =>
-                    setTheme((current) =>
-                      current === "system"
-                        ? "light"
-                        : current === "light"
-                          ? "dark"
-                          : "system",
-                    )
-                  }
-                >
-                  {theme === "system" ? (
-                    <Monitor size={17} />
-                  ) : theme === "light" ? (
-                    <Sun size={17} />
-                  ) : (
-                    <Moon size={17} />
-                  )}
-                </button>
-                {storageMessage && (
-                  <span
-                    className="storage-status"
-                    role="status"
-                    title={t(
-                      "Configurations are saved only in this browser. They may contain sensitive data and are not uploaded to third parties.",
-                    )}
-                  >
-                    {t(storageMessage)}
-                  </span>
-                )}
-                {updated && (
-                  <small>
-                    {updated}
-                    {t("Loaded")}
-                  </small>
-                )}
                 {remote && (
                   <>
                     <label
@@ -839,6 +749,63 @@ function App() {
                     </button>
                   </>
                 )}
+                {library.length > 0 && (
+                  <div className="saved-config-sizing">
+                    <span className="saved-config-measure" aria-hidden="true">
+                      {library.find((item) => item.id === activeConfigId)
+                        ?.name || t("Select a saved configuration")}
+                    </span>
+                    <select
+                      className="saved-config-switch"
+                      aria-label={t("Switch configuration")}
+                      title={
+                        library.find((item) => item.id === activeConfigId)
+                          ?.name || t("Switch configuration")
+                      }
+                      value={activeConfigId}
+                      onPointerDown={(event) => {
+                        event.currentTarget.dataset.pointerSelection = "true";
+                      }}
+                      onKeyDown={(event) => {
+                        delete event.currentTarget.dataset.pointerSelection;
+                      }}
+                      onBlur={(event) => {
+                        delete event.currentTarget.dataset.pointerSelection;
+                      }}
+                      onChange={(event) => {
+                        switchConfig(event.target.value);
+                        if (event.currentTarget.dataset.pointerSelection)
+                          event.currentTarget.blur();
+                      }}
+                    >
+                      <option value="" disabled>
+                        {t("Select a saved configuration")}
+                      </option>
+                      {library.map((item) => (
+                        <option key={item.id} value={item.id}>
+                          {item.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {storageMessage && (
+                  <span
+                    className="storage-status"
+                    role="status"
+                    title={t(
+                      "Configurations are saved only in this browser. They may contain sensitive data and are not uploaded to third parties.",
+                    )}
+                  >
+                    {t(storageMessage)}
+                  </span>
+                )}
+                {updated && (
+                  <small>
+                    {updated}
+                    {t("Loaded")}
+                  </small>
+                )}
                 <button
                   title={t("Download current configuration")}
                   onClick={download}
@@ -860,6 +827,7 @@ function App() {
                   className="primary compact-import"
                   onClick={() => {
                     setError("");
+                    setText("");
                     setModal(true);
                   }}
                 >
@@ -917,7 +885,7 @@ function App() {
                       }
                       onClick={() => changeListener("")}
                     >
-                      <Network size={15} />
+                      <LayoutGrid size={16} aria-hidden="true" />
                       {t("All resources")}
                       <span>{model.nodes.length}</span>
                     </button>
@@ -926,7 +894,6 @@ function App() {
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "listener")}
                       >
-                        <ChevronRight size={15} />
                         <Radio size={18} strokeWidth={2.2} aria-hidden="true" />
                         LISTENERS <span>{counts.listener}</span>
                       </summary>
@@ -939,7 +906,7 @@ function App() {
                             changeListener(n.id);
                           }}
                         >
-                          <Radio size={14} />
+                          <Radio size={16} aria-hidden="true" />
                           <div>
                             {nodeLabel(n)}
                             <small>{address(n.detail)}</small>
@@ -957,7 +924,6 @@ function App() {
                           toggleNavGroup(event, "filter_chain")
                         }
                       >
-                        <ChevronRight size={15} />
                         <Layers size={15} aria-hidden="true" />
                         FILTER CHAINS <span>{counts.filter_chain}</span>
                       </summary>
@@ -976,7 +942,7 @@ function App() {
                             className={`nav-item listener-item ${chain === n.id || selected?.id === n.id ? "active" : ""}`}
                             onClick={() => navigateFilterChain(n)}
                           >
-                            <Layers size={14} aria-hidden="true" />
+                            <Layers size={16} aria-hidden="true" />
                             <div>
                               {nodeLabel(n)}
                               {owner && <small>{nodeLabel(owner)}</small>}
@@ -990,7 +956,6 @@ function App() {
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "cluster")}
                       >
-                        <ChevronRight size={15} />
                         <Network size={15} aria-hidden="true" />
                         CLUSTERS <span>{counts.cluster}</span>
                       </summary>
@@ -1001,7 +966,7 @@ function App() {
                           className={`nav-item listener-item ${selected?.id === n.id ? "active" : ""}`}
                           onClick={() => navigateCluster(n)}
                         >
-                          <Network size={14} aria-hidden="true" />
+                          <Network size={16} aria-hidden="true" />
                           <div>
                             {nodeLabel(n)}
                             {n.state !== "unresolved" && (
@@ -1023,7 +988,6 @@ function App() {
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "endpoint")}
                       >
-                        <ChevronRight size={15} />
                         <Server size={15} aria-hidden="true" />
                         ENDPOINTS <span>{counts.endpoint}</span>
                       </summary>
@@ -1034,7 +998,7 @@ function App() {
                           className={`nav-item listener-item ${selected?.id === n.id ? "active" : ""}`}
                           onClick={() => navigateCluster(n)}
                         >
-                          <Server size={14} aria-hidden="true" />
+                          <Server size={16} aria-hidden="true" />
                           <div>{nodeLabel(n)}</div>
                         </button>
                       ))}
@@ -1286,6 +1250,61 @@ function App() {
                 </ResizableInspector>
               )}
             </div>
+            <div className="appearance-controls">
+              <button
+                className="language-toggle"
+                title={t("Change language")}
+                aria-label={t("Change language")}
+                onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
+              >
+                {language === "zh" ? "EN" : t("Chinese")}
+              </button>
+              <button
+                className="theme-toggle"
+                aria-label={t("Appearance: {0}", [
+                  t(
+                    theme === "system"
+                      ? "System; switch to light"
+                      : theme === "light"
+                        ? "Light; switch to dark"
+                        : "Dark; switch to system",
+                  ),
+                ])}
+                title={t("Current: {0}; switch to {1}", [
+                  t(
+                    theme === "system"
+                      ? "System"
+                      : theme === "light"
+                        ? "Light"
+                        : "Dark",
+                  ),
+                  t(
+                    theme === "system"
+                      ? "Light"
+                      : theme === "light"
+                        ? "Dark"
+                        : "System",
+                  ),
+                ])}
+                onClick={() =>
+                  setTheme((current) =>
+                    current === "system"
+                      ? "light"
+                      : current === "light"
+                        ? "dark"
+                        : "system",
+                  )
+                }
+              >
+                {theme === "system" ? (
+                  <Monitor size={17} />
+                ) : theme === "light" ? (
+                  <Sun size={17} />
+                ) : (
+                  <Moon size={17} />
+                )}
+              </button>
+            </div>
           </section>
         </main>
       </div>
@@ -1412,6 +1431,7 @@ function App() {
                   className="primary"
                   onClick={() => {
                     setError("");
+                    setText("");
                     setModal(true);
                   }}
                 >
@@ -1568,7 +1588,7 @@ function App() {
                       id="admin-address"
                       value={addressValue}
                       onChange={(e) => setAddress(e.target.value)}
-                      placeholder="http://127.0.0.1:9901"
+                      placeholder="http://127.0.0.1:15000"
                     />
                     <p>
                       {t("The server sends a read-only request to")}

@@ -352,7 +352,7 @@ main {
   min-height: 40px;
 }
 .floating-shell .explorer-header .search {
-  margin-left: auto;
+  margin-left: 0;
   width: clamp(160px, 18vw, 290px);
   min-width: 160px;
   min-height: 40px;
@@ -372,6 +372,7 @@ main {
   min-height: 40px;
 }
 .floating-shell .explorer-header .source-actions {
+  margin-left: auto;
   height: 40px;
   min-height: 40px;
   padding: 3px 6px;
@@ -628,6 +629,7 @@ main {
 }
 
 .nav-group > summary {
+  position: relative;
   cursor: pointer;
   list-style: none;
   justify-content: flex-start;
@@ -649,8 +651,19 @@ main {
   margin-top: 2px;
   line-height: 18px;
 }
+/* Keep group and resource icons aligned without disclosure arrows. */
+.resource-nav .nav-group > .listener-item {
+  padding-left: 8px;
+  gap: 6px;
+}
 .resource-nav .listener-item > svg {
-  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+.nav-group > summary > svg {
+  width: 16px;
+  height: 16px;
 }
 .nav-group > summary > span {
   margin-left: auto;
@@ -658,9 +671,6 @@ main {
 }
 .nav-group > summary > svg {
   flex: none;
-}
-.nav-group[open] > summary > svg:first-child {
-  transform: rotate(90deg);
 }
 .nav-group > summary:hover {
   color: var(--palette-283749);
@@ -748,6 +758,21 @@ main {
 .floating-shell .relationship-toolbar label {
   align-items: center;
 }
+.floating-shell .filter-chain-toolbar {
+  background: var(--palette-white);
+  padding: 5px 8px;
+}
+.floating-shell .filter-chain-toolbar label {
+  gap: 4px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.filter-chain-label {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding-left: 4px;
+}
 .chain-select {
   position: relative;
   display: inline-flex;
@@ -755,6 +780,8 @@ main {
 }
 .chain-select > svg {
   position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   right: 9px;
   pointer-events: none;
 }
@@ -763,20 +790,31 @@ main {
   -webkit-appearance: none;
   margin: 0;
   height: 32px;
-  padding: 0 30px 0 10px;
-  line-height: normal;
+  padding: 5px 30px 5px 8px;
+  font: inherit;
+  line-height: 20px;
   max-width: 240px;
-  border: 1px solid var(--glass-line);
+  border: 1px solid transparent;
 }
 .floating-shell .relationship-toolbar button {
   height: 32px;
   line-height: 20px;
 }
-.floating-shell .relationship-toolbar .chain-select select:focus,
-.floating-shell .relationship-toolbar .chain-select select:focus-visible {
+.floating-shell .relationship-toolbar .chain-select select {
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.floating-shell .relationship-toolbar .chain-select select:hover {
+  background-color: var(--palette-eaf0f3);
+  border-color: var(--glass-line);
+}
+.floating-shell .relationship-toolbar .chain-select select:focus {
   outline: none;
   box-shadow: none;
-  border-color: #77776f;
+}
+.floating-shell .relationship-toolbar .chain-select select:focus-visible:not([data-pointer-selection]) {
+  outline: 2px solid #898983;
+  outline-offset: -2px;
 }
 @media (max-width: 900px) {
   .floating-shell .relationship-toolbar .chain-select select {
@@ -852,8 +890,7 @@ main {
   position: absolute;
   z-index: 14;
   left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 64px;
   width: var(--nav-width, 180px);
   max-height: calc(100dvh - 128px);
 }
@@ -1030,18 +1067,58 @@ main {
   gap: 3px;
   flex-shrink: 1;
   min-width: 0;
+  /* Keep canvas labels from showing through the configuration controls. */
+  background: var(--palette-white);
+}
+/* Measure only the selected label, not the longest option in the menu. */
+.floating-shell .source-actions .saved-config-sizing {
+  position: relative;
+  flex: 0 1 auto;
+  min-width: 90px;
+  max-width: min(420px, 40vw);
+  height: 32px;
+}
+.saved-config-measure {
+  display: block;
+  visibility: hidden;
+  white-space: pre;
+  padding: 0 30px 0 10px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 13px;
 }
 .floating-shell .source-actions .saved-config-switch {
-  flex: 0 1 150px;
-  width: 150px;
-  min-width: 85px;
-  max-width: 150px;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  height: 32px;
+  margin: 0;
+  padding: 0 30px 0 10px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23898983' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  font-size: 13px;
+  line-height: normal;
   text-overflow: ellipsis;
+  cursor: pointer;
+}
+.floating-shell .source-actions .saved-config-switch:hover {
+  background-color: var(--palette-eaf0f3);
 }
 .floating-shell .source-actions .saved-config-switch:focus {
   outline: none;
   box-shadow: none;
-  border-color: #77776f;
+}
+.floating-shell .source-actions .saved-config-switch:focus-visible:not([data-pointer-selection]) {
+  outline: 2px solid #898983;
+  outline-offset: -2px;
 }
 .floating-shell .source-actions .auto {
   gap: 3px;
@@ -1057,9 +1134,8 @@ main {
   border-radius: 7px;
 }
 @media (max-width: 1100px) {
-  .floating-shell .source-actions .saved-config-switch {
-    width: 110px;
-    flex-basis: 110px;
+  .floating-shell .source-actions .saved-config-sizing {
+    max-width: min(280px, 40vw);
   }
   .floating-shell .explorer-header .search {
     flex-basis: 120px;
@@ -1260,4 +1336,31 @@ html[lang="en"] .floating-shell .explorer-header .view-tabs button {
 .dropzone:focus-within {
   outline: 2px solid #84967a;
   outline-offset: 3px;
+}
+
+/* Global appearance controls stay out of the main action bar. */
+.floating-shell .appearance-controls {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(20px) saturate(120%);
+  -webkit-backdrop-filter: blur(20px) saturate(120%);
+}
+.floating-shell .appearance-controls button {
+  min-width: 36px;
+  height: 36px;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+.floating-shell .canvas-layout > .inspector {
+  bottom: calc(66px + env(safe-area-inset-bottom));
 }

@@ -413,17 +413,28 @@ export default function RelationshipGraph({
           onClose={closePreview}
         />
       )}
-      <div className="relationship-toolbar">
+      <div className="relationship-toolbar filter-chain-toolbar">
         <label>
-          FilterChain{" "}
+          <span className="filter-chain-label">FilterChain</span>
           <span className="chain-select">
             <select
               aria-label={t("Filter by filter chain")}
               value={chain}
+              onPointerDown={(event) => {
+                event.currentTarget.dataset.pointerSelection = "true";
+              }}
+              onKeyDown={(event) => {
+                delete event.currentTarget.dataset.pointerSelection;
+              }}
+              onBlur={(event) => {
+                delete event.currentTarget.dataset.pointerSelection;
+              }}
               onChange={(e) => {
                 setChain(e.target.value);
                 onSelect(null);
                 viewport.current?.scrollTo(0, 0);
+                if (e.currentTarget.dataset.pointerSelection)
+                  e.currentTarget.blur();
               }}
             >
               <option value="">{t("All filter chains")}</option>

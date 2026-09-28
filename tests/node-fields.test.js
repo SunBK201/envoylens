@@ -27,7 +27,7 @@ test("match shows at most three conditions while preserving full values", () => 
     transport_protocol: "tls",
   });
 });
-test("route displays path, weighted target and explicit timeout including zero", () => {
+test("route displays path and explicit timeout instead of weighted targets", () => {
   assert.deepEqual(
     fields("route", {
       match: { prefix: "/" },
@@ -41,7 +41,7 @@ test("route displays path, weighted target and explicit timeout including zero",
         timeout: "0s",
       },
     }),
-    { prefix: "/", weighted_clusters: "a: 90 / b: 10", timeout: "0s" },
+    { prefix: "/", timeout: "0s" },
   );
 });
 test("cluster shows timeout and discovery policy without losing numeric zero", () => {
@@ -99,5 +99,43 @@ test("summaries preserve complete long values for search and tooltips", () => {
       kind: "virtual_host",
       detail: { domains: [name], routes: [] },
     }).includes(name),
+  );
+});
+
+test("route hides all target variants and preserves rewrite and timeout", () => {
+  for (const target of [
+    { cluster: "backend" },
+    { cluster_header: "x-cluster" },
+    { clusterSpecifierPlugin: "plugin" },
+  ]) {
+    assert.deepEqual(
+      fields("route", {
+        match: { path: "/api" },
+        route: { ...target, timeout: "2.5s", prefixRewrite: "/" },
+      }),
+      { path: "/api", timeout: "2.5s", prefix_rewrite: "/" },
+    );
+  }
+});
+
+test("route does not invent timeout defaults or add timeout to direct responses", () => {
+  assert.deepEqual(
+    fields("route", {
+      match: { prefix: "/" },
+      route: { cluster: "backend" },
+    }),
+    { prefix: "/", timeout: "Not configured" },
+  );
+  assert.equal(fields("route", { route: { timeout: 0 } }).timeout, "0");
+  assert.deepEqual(
+    fields("route", {
+      match: { path: "/health" },
+      directResponse: { status: 200 },
+    }),
+    { path: "/health", status: "200", action: "Direct response" },
+  );
+  assert.equal(
+    fields("route", { redirect: { https_redirect: true } }).timeout,
+    undefined,
   );
 });
