@@ -1,0 +1,120 @@
+import "fake-indexeddb/auto";
+import test from "node:test";
+import assert from "node:assert/strict";
+import {
+  saveLastConfig,
+  readLastConfig,
+  readConfigLibrary,
+  saveConfig,
+  activateConfig,
+  removeConfig,
+  renameConfig,
+} from "../src/config-storage.js";
+
+test("migrates the legacy snapshot without losing content", async () => {
+  await saveLastConfig({
+    text: "legacy",
+    source: "old.json",
+    remote: "",
+    savedAt: "today",
+  });
+  const items = await readConfigLibrary();
+  assert.equal(items.length, 1);
+  assert.equal(items[0].text, "legacy");
+  assert.equal(items[0].name, "old.json");
+  assert(items[0].id);
+  assert.equal((await readLastConfig()).id, items[0].id);
+});
+test("keeps paste, upload and multiple Admin configurations and switches the active snapshot", async () => {
+  const pasted = await saveConfig({
+    text: "paste",
+    source: "Paste configuration",
+    name: "Test",
+  });
+  const uploaded = await saveConfig({ text: "upload", source: "file.yaml" });
+  const admin = await saveConfig({
+    text: "admin",
+    source: "url",
+    remote: "http://localhost:9901",
+  });
+  await saveConfig({
+    text: "admin2",
+    source: "url2",
+    remote: "http://localhost:9902",
+  });
+  const items = await readConfigLibrary();
+  for (const id of [pasted.item.id, uploaded.item.id, admin.item.id])
+    assert(items.some((item) => item.id === id));
+  await activateConfig(pasted.item.id);
+  assert.equal((await readLastConfig()).name, "Test");
+  assert.equal(await activateConfig("missing"), null);
+  assert.equal((await readLastConfig()).id, pasted.item.id);
+});
+test("Admin refresh updates in place and preserves the custom name", async () => {
+  const first = await saveConfig({
+    text: "v1",
+    source: "url",
+    remote: "http://host:9901",
+    name: "Production",
+  });
+  const refreshed = await saveConfig({
+    text: "v2",
+    source: "url",
+    remote: "http://host:9901",
+  });
+  assert.equal(refreshed.item.id, first.item.id);
+  assert.equal(refreshed.item.name, "Production");
+  assert.equal(refreshed.items.length, first.items.length);
+  assert.equal((await readLastConfig()).text, "v2");
+  assert.equal((await readLastConfig()).auto, undefined);
+});
+test("rename and deletion affect only the chosen configuration", async () => {
+  const first = await saveConfig({ text: "a", source: "a" });
+  const second = await saveConfig({ text: "b", source: "b" });
+  await renameConfig(second.item.id, "Renamed");
+  assert.equal((await readLastConfig()).name, "Renamed");
+  await removeConfig(first.item.id);
+  assert.equal((await readLastConfig()).id, second.item.id);
+  const items = await removeConfig(second.item.id);
+  assert(
+    !items.some(
+      (item) => item.id === first.item.id || item.id === second.item.id,
+    ),
+  );
+  assert.equal(await readLastConfig(), undefined);
+  assert((await readConfigLibrary()).length > 0);
+});
+
+test("editing an existing inactive config preserves its ID and active selection", async () => {
+  const first = await saveConfig({
+    text: "original",
+    source: "edit.yaml",
+    name: "Before",
+  });
+  const current = await saveConfig({ text: "current", source: "current.yaml" });
+  const before = await readConfigLibrary();
+  const result = await saveConfig(
+    {
+      ...first.item,
+      text: "edited",
+      name: "After",
+      remote: "http://new-host:9901",
+    },
+    { activate: false },
+  );
+  assert.equal(result.item.id, first.item.id);
+  assert.equal(result.items.length, before.length);
+  assert.equal(result.item.text, "edited");
+  assert.equal(result.item.name, "After");
+  assert.equal((await readLastConfig()).id, current.item.id);
+  assert.equal(
+    result.items.find((item) => item.id === current.item.id).text,
+    "current",
+  );
+});
+test("editing the active config updates the restored snapshot", async () => {
+  const result = await saveConfig({ text: "old", source: "active-edit.yaml" });
+  await saveConfig({ ...result.item, text: "new" });
+  assert.equal((await readLastConfig()).text, "new");
+  assert.equal((await readLastConfig()).id, result.item.id);
+});

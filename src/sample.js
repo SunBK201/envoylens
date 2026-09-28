@@ -1,0 +1,65 @@
+export const sample = `node:
+  id: gateway-demo
+  cluster: edge-proxy
+static_resources:
+  listeners:
+    - name: ingress_http
+      address:
+        socket_address: { address: 0.0.0.0, port_value: 8080 }
+      filter_chains:
+        - name: public_http
+          filter_chain_match:
+            transport_protocol: raw_buffer
+          filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                '@type': type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: ingress_http
+                codec_type: AUTO
+                http_filters:
+                  - name: envoy.filters.http.cors
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+                route_config:
+                  name: public_routes
+                  virtual_hosts:
+                    - name: api_service
+                      domains: ['api.example.com']
+                      routes:
+                        - name: api_v1
+                          match: { prefix: /api/ }
+                          route:
+                            weighted_clusters:
+                              clusters:
+                                - { name: api_stable, weight: 90 }
+                                - { name: api_canary, weight: 10 }
+                        - name: health_check
+                          match: { path: /healthz }
+                          direct_response: { status: 200, body: { inline_string: OK } }
+  clusters:
+    - name: api_stable
+      type: STRICT_DNS
+      connect_timeout: 2s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: api_stable
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: api.internal, port_value: 9000 }
+    - name: api_canary
+      type: STRICT_DNS
+      connect_timeout: 2s
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: api_canary
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: canary.internal, port_value: 9000 }
+`;

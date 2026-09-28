@@ -1,0 +1,1630 @@
+import {
+  t,
+  nodeLabel,
+  getLanguage,
+  setLanguage,
+  subscribeLanguage,
+} from "./i18n";
+import React, {
+  useState,
+  useMemo,
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+} from "react";
+import { createRoot } from "react-dom/client";
+import {
+  Network,
+  Upload,
+  FileCode2,
+  FolderCog,
+  Trash2,
+  Pencil,
+  Radio,
+  Search,
+  ChevronRight,
+  Layers,
+  Server,
+  ArrowUpRight,
+  X,
+  RefreshCw,
+  Download,
+  Copy,
+  Check,
+  GitBranch,
+  PanelLeftClose,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  Braces,
+  Monitor,
+  Sun,
+  Moon,
+} from "lucide-react";
+import "./style.css";
+import "./floating-shell.css";
+import { readTheme, applyTheme } from "./theme";
+import { parseConfig } from "./parser";
+import { fetchAdminConfig } from "./admin-fetch";
+import { originLabel } from "./node-fields";
+import { configIdentity, restoreView, saveView } from "./view-storage";
+import { sample } from "./sample";
+import RelationshipGraph, { summary } from "./RelationshipGraph";
+import ConfigViewer from "./ConfigViewer";
+import { envoyReference } from "./envoy-docs";
+import { retainRefreshView } from "./refresh-view";
+import { sortedResources } from "./resource-sort";
+import { readNavGroups, saveNavGroups } from "./nav-groups";
+import JsonCode from "./JsonCode";
+import ResizableInspector from "./ResizableInspector";
+import {
+  readLastConfig,
+  saveConfig,
+  readConfigLibrary,
+  activateConfig,
+  removeConfig,
+  renameConfig,
+} from "./config-storage";
+const meta = {
+  listener: ["Listener", "#6f9466"],
+  listener_filter: ["Listener filter", "#9a9870"],
+  filter_chain: ["Filter chain", "#a78b62"],
+  match: ["Match", "#c29132"],
+  network_filter: ["Network filter", "#0f766e"],
+  http_filter: ["HTTP filter", "#749646"],
+  route_config: ["Route config", "#cc7d44"],
+  virtual_host: ["Virtual host", "#c09249"],
+  route: ["Route", "#d38a36"],
+  cluster: ["Cluster", "#be185d"],
+  endpoint: ["Endpoint", "#a38369"],
+  action: ["Response", "#92958a"],
+  dynamic: ["Dynamic", "#ba8870"],
+  resource: ["Resource", "#92958a"],
+};
+const short = (s) =>
+  s?.replace(/^envoy\.filters\.(network|http|listener)\./, "") || "Unnamed";
+function address(o) {
+  const a = o.address?.socket_address || o.address?.socketAddress;
+  return a
+    ? `${a.address}:${a.port_value ?? a.portValue}`
+    : "Configuration resource";
+}
+function Graph(props) {
+  return <RelationshipGraph {...props} meta={meta} />;
+}
+function App() {
+  const language = useSyncExternalStore(
+    subscribeLanguage,
+    getLanguage,
+    () => "zh",
+  );
+  useEffect(() => {
+    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+  }, [language]);
+  const [theme, setTheme] = useState(() =>
+    readTheme({ getItem: (key) => window.localStorage.getItem(key) }),
+  );
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () =>
+      applyTheme(theme, media.matches, document.documentElement, {
+        setItem: (key, value) => window.localStorage.setItem(key, value),
+      });
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, [theme]);
+  const [model, setModel] = useState(() => parseConfig(sample)),
+    [source, setSource] = useState("Demo configuration"),
+    [text, setText] = useState(sample),
+    [modal, setModal] = useState(false),
+    [tab, setTab] = useState("paste"),
+    [addressValue, setAddress] = useState("http://127.0.0.1:9901"),
+    [error, setError] = useState(""),
+    [busy, setBusy] = useState(false),
+    [selected, setSelected] = useState(null),
+    [detailsOpen, setDetailsOpen] = useState(false),
+    [query, setQuery] = useState(""),
+    [listener, setListener] = useState(""),
+    [chain, setChain] = useState(""),
+    [viewReady, setViewReady] = useState(false),
+    [view, setView] = useState(() => {
+      try {
+        const saved = window.localStorage.getItem("envoylens-active-view");
+        return ["graph", "list", "raw"].includes(saved) ? saved : "graph";
+      } catch {
+        return "graph";
+      }
+    }),
+    [auto, setAuto] = useState(false),
+    [remote, setRemote] = useState(""),
+    [updated, setUpdated] = useState(""),
+    [copied, setCopied] = useState(false),
+    [storageMessage, setStorageMessage] = useState("");
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("envoylens-active-view", view);
+    } catch {
+      // Keep navigation usable when browser storage is unavailable.
+    }
+  }, [view]);
+  const [library, setLibrary] = useState([]);
+  const [activeConfigId, setActiveConfigId] = useState("");
+  const [importName, setImportName] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [canvasRevision, setCanvasRevision] = useState(0);
+  const currentView = useRef(null);
+  currentView.current = {
+    activeConfigId,
+    model,
+    listener,
+    chain,
+    selected,
+    detailsOpen,
+    remote,
+  };
+  const busyRef = useRef(false),
+    generation = useRef(0),
+    storageVersion = useRef(0),
+    [side, setSide] = useState(true);
+  const [navWidth, setNavWidth] = useState(() => {
+    try {
+      const saved = Number(window.localStorage.getItem("envoylens-nav-width"));
+      return Number.isFinite(saved) && saved >= 160
+        ? Math.min(520, saved)
+        : 180;
+    } catch {
+      return 180;
+    }
+  });
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const navMax = Math.max(160, Math.min(520, windowWidth - 180));
+  const displayedNavWidth = Math.min(navWidth, navMax);
+  const navDrag = useRef(null);
+  const [resizingNav, setResizingNav] = useState(false);
+  useEffect(() => {
+    const resize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("envoylens-nav-width", String(navWidth));
+    } catch {}
+  }, [navWidth]);
+  function resizeNav(width) {
+    setNavWidth(Math.max(160, Math.min(navMax, width)));
+  }
+  const [identity, setIdentity] = useState(() => configIdentity(sample));
+  useEffect(() => {
+    if (viewReady)
+      saveView(
+        { setItem: (key, value) => window.localStorage.setItem(key, value) },
+        identity,
+        listener,
+        chain,
+      );
+  }, [viewReady, identity, listener, chain]);
+  const [navGroups, setNavGroups] = useState(() =>
+    readNavGroups({
+      getItem: (key) => window.localStorage.getItem(key),
+    }),
+  );
+  useEffect(() => {
+    saveNavGroups(
+      { setItem: (key, value) => window.localStorage.setItem(key, value) },
+      navGroups,
+    );
+  }, [navGroups]);
+  function toggleNavGroup(event, kind) {
+    event.preventDefault();
+    setNavGroups((current) => ({ ...current, [kind]: !current[kind] }));
+  }
+  const [sortDirection, setSortDirection] = useState(() => {
+    try {
+      return localStorage.getItem("envoylens-nav-sort") === "desc"
+        ? "desc"
+        : "asc";
+    } catch {
+      return "asc";
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("envoylens-nav-sort", sortDirection);
+    } catch {}
+  }, [sortDirection]);
+  function orderedResources(kind) {
+    return sortedResources(model.nodes, kind, sortDirection);
+  }
+  function changeListener(id) {
+    setCanvasRevision((value) => value + 1);
+    setFocusTarget(null);
+    setListener(id);
+    setChain("");
+    setSelected(null);
+    setDetailsOpen(false);
+  }
+  const [focusTarget, setFocusTarget] = useState(null);
+  function navigateCluster(node) {
+    setListener("");
+    setChain("");
+    setQuery("");
+    setView("graph");
+    selectResource(node);
+    setFocusTarget({ id: node.id });
+  }
+  function navigateFilterChain(node) {
+    setListener("");
+    setChain(node.id);
+    setQuery("");
+    setView("graph");
+    selectResource(node);
+    setFocusTarget({ id: node.id });
+  }
+  function selectResource(node, openDetails = true) {
+    setSelected(node);
+    setDetailsOpen(Boolean(node) && openDetails);
+  }
+  function toggleResourceDetails(node) {
+    const next = selected?.id === node.id ? null : node;
+    setSelected(next);
+    setDetailsOpen(Boolean(next));
+  }
+  function install(content, name, options = {}) {
+    setFocusTarget(null);
+    const m = parseConfig(content);
+    setModel(m);
+    setIdentity(configIdentity(content));
+    setSource(name);
+    if (options.preserveView) {
+      const current = currentView.current;
+      const retained = retainRefreshView(current.model, m, current);
+      setListener(retained.listener);
+      setChain(retained.chain);
+      setSelected(retained.selected);
+      setDetailsOpen(retained.detailsOpen);
+    } else {
+      setCanvasRevision((value) => value + 1);
+      setSelected(null);
+      setDetailsOpen(false);
+      const previousView = options.restore
+        ? restoreView(
+            { getItem: (key) => window.localStorage.getItem(key) },
+            configIdentity(content),
+            m,
+          )
+        : { listener: "", chain: "" };
+      setListener(previousView.listener);
+      setChain(previousView.chain);
+      setQuery("");
+    }
+    setViewReady(true);
+    setError("");
+    setModal(false);
+    setText(content);
+    const savedAt = options.savedAt || new Date().toISOString();
+    setUpdated(new Date(savedAt).toLocaleTimeString("zh-CN"));
+    if (!options.restore) {
+      const version = ++storageVersion.current;
+      setStorageMessage("Saving…");
+      saveConfig({
+        id: options.preserveView
+          ? currentView.current.activeConfigId
+          : undefined,
+        name: options.preserveView ? undefined : importName,
+        text: content,
+        source: name,
+        remote: options.remote || "",
+        savedAt,
+      })
+        .then(({ item, items }) => {
+          if (version !== storageVersion.current) return;
+          setLibrary(items);
+          setActiveConfigId(item.id);
+          setImportName("");
+
+          setStorageMessage("Saved in this browser");
+        })
+        .catch(() => {
+          if (version === storageVersion.current) {
+            setStorageMessage(
+              "Save failed: browser storage is full or unavailable",
+            );
+            setError(
+              "Configuration parsed, but browser storage is full or unavailable.",
+            );
+          }
+        });
+    }
+  }
+  function loadLocal(content, name) {
+    generation.current++;
+    try {
+      install(content, name);
+      setAuto(false);
+      setRemote("");
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  async function fetchAdmin(addr = addressValue) {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    setError("");
+    const gen = ++generation.current;
+    try {
+      const data = await fetchAdminConfig(addr);
+      if (gen !== generation.current) return;
+      install(data.text, addr, {
+        remote: addr,
+        preserveView: currentView.current.remote === addr,
+      });
+      setRemote(addr);
+    } catch (e) {
+      if (gen === generation.current) {
+        setError(e.message);
+        setAuto(false);
+      }
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    let cancelled = false;
+    const gen = generation.current;
+    readConfigLibrary()
+      .then((items) => {
+        if (!cancelled && gen === generation.current) setLibrary(items);
+        return readLastConfig();
+      })
+      .then((saved) => {
+        if (cancelled || gen !== generation.current) return;
+        if (!saved) {
+          const previousView = restoreView(
+            { getItem: (key) => window.localStorage.getItem(key) },
+            configIdentity(sample),
+            parseConfig(sample),
+          );
+          setListener(previousView.listener);
+          setChain(previousView.chain);
+          setViewReady(true);
+          return;
+        }
+
+        setActiveConfigId(saved.id || "");
+        if (
+          saved.version !== 1 ||
+          typeof saved.text !== "string" ||
+          typeof saved.source !== "string"
+        )
+          throw new Error("Invalid snapshot");
+        install(saved.text, saved.source, {
+          restore: true,
+          savedAt: saved.savedAt,
+        });
+        setRemote(typeof saved.remote === "string" ? saved.remote : "");
+        if (saved.remote) setAddress(saved.remote);
+        setAuto(false);
+        setStorageMessage("Restored the last configuration (local snapshot)");
+      })
+      .catch(() => {
+        if (!cancelled && gen === generation.current) {
+          setStorageMessage(
+            "Could not restore the configuration. Please import it again.",
+          );
+          setViewReady(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  async function switchConfig(id) {
+    const item = library.find((entry) => entry.id === id);
+    if (!item) return;
+    try {
+      parseConfig(item.text);
+      generation.current++;
+      ++storageVersion.current;
+      setAuto(false);
+      install(item.text, item.source, { restore: true, savedAt: item.savedAt });
+      setActiveConfigId(id);
+      setRemote(item.remote || "");
+      if (item.remote) setAddress(item.remote);
+
+      await activateConfig(id);
+      setStorageMessage("Switched to saved snapshot");
+    } catch (error) {
+      setError(`Switch failed: ${error.message}`);
+    }
+  }
+  async function deleteSavedConfig(id) {
+    const current = id === activeConfigId;
+    if (current) {
+      generation.current++;
+      ++storageVersion.current;
+      setAuto(false);
+    }
+    try {
+      setLibrary(await removeConfig(id));
+      if (current) {
+        setActiveConfigId("");
+      }
+      setStorageMessage(
+        "Saved configuration deleted; the current graph is retained",
+      );
+    } catch {
+      setError("Delete failed. Check browser storage permissions.");
+    }
+  }
+  function editSavedConfig(item) {
+    generation.current++;
+    setAuto(false);
+    setEditing({ ...item });
+    setError("");
+    setModal("edit");
+  }
+  async function saveEditedConfig() {
+    if (!editing || savingEdit) return;
+    try {
+      parseConfig(editing.text);
+      const remoteAddress = (editing.remote || "").trim();
+      if (remoteAddress) {
+        const url = new URL(remoteAddress);
+        if (
+          !["http:", "https:"].includes(url.protocol) ||
+          url.username ||
+          url.password
+        )
+          throw new Error(
+            "Admin address must use HTTP/HTTPS and must not contain credentials.",
+          );
+      }
+      setSavingEdit(true);
+      setError("");
+      const isCurrent = currentView.current.activeConfigId === editing.id;
+      generation.current++;
+      ++storageVersion.current;
+      const { item, items } = await saveConfig(
+        {
+          ...editing,
+          name: editing.name.trim() || editing.source,
+          remote: remoteAddress,
+          savedAt: new Date().toISOString(),
+        },
+        { activate: isCurrent },
+      );
+      setLibrary(items);
+      if (isCurrent) {
+        install(item.text, item.source, {
+          restore: true,
+          preserveView: true,
+          savedAt: item.savedAt,
+        });
+        setRemote(item.remote);
+        if (item.remote) setAddress(item.remote);
+      }
+      setEditing(null);
+      setModal("manage");
+      setStorageMessage("Configuration changes saved");
+    } catch (error) {
+      setError(`Save failed: ${error.message}`);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+  async function renameSavedConfig(id, name) {
+    try {
+      setLibrary(await renameConfig(id, name));
+    } catch {
+      setError("Rename failed. Check browser storage permissions.");
+    }
+  }
+  useEffect(() => {
+    if (!auto || !remote) return;
+    const timer = setInterval(() => fetchAdmin(remote), 10000);
+    return () => clearInterval(timer);
+  }, [auto, remote]);
+  async function upload(file) {
+    if (!file) return;
+    try {
+      const content = await file.text();
+      loadLocal(content, file.name);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+  const counts = Object.fromEntries(
+    Object.keys(meta).map((k) => [
+      k,
+      model.nodes.filter((n) => n.kind === k).length,
+    ]),
+  );
+  useEffect(() => {
+    if (!modal) return;
+    const dialog = document.querySelector("[role=dialog]");
+    const previous = document.activeElement;
+    dialog?.querySelector("button")?.focus();
+    const handler = (e) => {
+      if (e.key === "Escape") {
+        if (savingEdit) return;
+        setModal(false);
+        return;
+      }
+      if (e.key !== "Tab") return;
+      const items = [
+        ...dialog.querySelectorAll("button:not(:disabled),input,textarea"),
+      ];
+      const first = items[0],
+        last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("keydown", handler);
+      previous?.focus();
+    };
+  }, [modal, savingEdit]);
+  useEffect(() => {
+    if ((!detailsOpen && !selected) || modal) return;
+    const handler = (event) => {
+      if (event.key === "Escape" && !event.isComposing) {
+        if (event.repeat) return;
+        if (detailsOpen) setDetailsOpen(false);
+        else setSelected(null);
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [detailsOpen, selected, modal]);
+  const resourceGroups = useMemo(() => {
+    const groups = new Map(Object.keys(meta).map((kind) => [kind, []]));
+    const term = query.trim().toLowerCase();
+    for (const node of model.nodes) {
+      if (
+        !(node.label + " " + JSON.stringify(node.detail))
+          .toLowerCase()
+          .includes(term)
+      )
+        continue;
+      if (!groups.has(node.kind)) groups.set(node.kind, []);
+      groups.get(node.kind).push(node);
+    }
+    return [...groups].filter(([, nodes]) => nodes.length);
+  }, [model, query]);
+  const details = selected?.detail ?? model.raw;
+  const reference = envoyReference(selected);
+  useEffect(() => {
+    if (!viewReady) {
+      document.title = "EnvoyLens";
+      return;
+    }
+    const page = {
+      graph: "Graph",
+      list: "Resources",
+      raw: "Full configuration",
+    }[view];
+    const resource =
+      detailsOpen && selected
+        ? selected
+        : view === "graph"
+          ? selected ||
+            model.nodes.find((node) => node.id === (chain || listener))
+          : null;
+    document.title = [
+      "EnvoyLens",
+      t(page),
+      resource ? nodeLabel(resource) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }, [
+    viewReady,
+    view,
+    detailsOpen,
+    selected,
+    model,
+    chain,
+    listener,
+    language,
+  ]);
+  function download() {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(model.raw, null, 2)], {
+        type: "application/json",
+      }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "envoy-config.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+  return (
+    <div className="app">
+      <div className="workspace">
+        <main>
+          <section
+            className={`explorer floating-shell ${side ? "nav-open" : "nav-closed"} ${resizingNav ? "resizing-nav" : ""}`}
+            style={{ "--nav-width": `${displayedNavWidth}px` }}
+          >
+            <div className="explorer-header">
+              <div className="source">
+                <span className="compact-brand">
+                  Envoy<span>Lens</span>
+                </span>
+                {!activeConfigId && (
+                  <>
+                    <span className="source-dot" />
+                    <strong title={source}>{t(source)}</strong>
+                  </>
+                )}
+                {source === "Demo configuration" && (
+                  <span className="demo-tag">DEMO</span>
+                )}
+              </div>
+              <div className="toolbar">
+                <div className="view-tabs">
+                  <button
+                    className={view === "graph" ? "active" : ""}
+                    onClick={() => setView("graph")}
+                  >
+                    <Network size={15} />
+                    {t("Graph")}
+                  </button>
+                  <button
+                    className={view === "list" ? "active" : ""}
+                    onClick={() => setView("list")}
+                  >
+                    <Layers size={15} />
+                    {t("Resources")}
+                  </button>
+                  <button
+                    className={view === "raw" ? "active" : ""}
+                    onClick={() => setView("raw")}
+                  >
+                    <Braces size={15} />
+                    {t("Full configuration")}
+                  </button>
+                </div>
+                {selected && (
+                  <button
+                    className="details-toggle"
+                    aria-expanded={detailsOpen}
+                    onClick={() => setDetailsOpen(!detailsOpen)}
+                    title={nodeLabel(selected)}
+                  >
+                    {detailsOpen ? t("Hide details") : t("Show details")}
+                  </button>
+                )}
+                <div className="search">
+                  <Search size={15} />
+                  <input
+                    data-resource-search="true"
+                    aria-label={t("Search resources")}
+                    placeholder={t("Search names or configuration fields…")}
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                  />
+                  {query && (
+                    <button
+                      onClick={() => setQuery("")}
+                      aria-label={t("Clear search")}
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="source-actions">
+                {library.length > 0 && (
+                  <select
+                    className="saved-config-switch"
+                    aria-label={t("Switch configuration")}
+                    title={
+                      library.find((item) => item.id === activeConfigId)
+                        ?.name || t("Switch configuration")
+                    }
+                    value={activeConfigId}
+                    onChange={(event) => switchConfig(event.target.value)}
+                  >
+                    <option value="" disabled>
+                      {t("Select a saved configuration")}
+                    </option>
+                    {library.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  className="language-toggle"
+                  title={t("Change language")}
+                  aria-label={t("Change language")}
+                  onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
+                >
+                  {language === "zh" ? "EN" : t("Chinese")}
+                </button>
+                <button
+                  className="theme-toggle"
+                  aria-label={t("Appearance: {0}", [
+                    t(
+                      theme === "system"
+                        ? "System; switch to light"
+                        : theme === "light"
+                          ? "Light; switch to dark"
+                          : "Dark; switch to system",
+                    ),
+                  ])}
+                  title={t("Current: {0}; switch to {1}", [
+                    t(
+                      theme === "system"
+                        ? "System"
+                        : theme === "light"
+                          ? "Light"
+                          : "Dark",
+                    ),
+                    t(
+                      theme === "system"
+                        ? "Light"
+                        : theme === "light"
+                          ? "Dark"
+                          : "System",
+                    ),
+                  ])}
+                  onClick={() =>
+                    setTheme((current) =>
+                      current === "system"
+                        ? "light"
+                        : current === "light"
+                          ? "dark"
+                          : "system",
+                    )
+                  }
+                >
+                  {theme === "system" ? (
+                    <Monitor size={17} />
+                  ) : theme === "light" ? (
+                    <Sun size={17} />
+                  ) : (
+                    <Moon size={17} />
+                  )}
+                </button>
+                {storageMessage && (
+                  <span
+                    className="storage-status"
+                    role="status"
+                    title={t(
+                      "Configurations are saved only in this browser. They may contain sensitive data and are not uploaded to third parties.",
+                    )}
+                  >
+                    {t(storageMessage)}
+                  </span>
+                )}
+                {updated && (
+                  <small>
+                    {updated}
+                    {t("Loaded")}
+                  </small>
+                )}
+                {remote && (
+                  <>
+                    <label
+                      className="auto"
+                      title={t(
+                        "Refresh the current Admin configuration every 10 seconds",
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={t("Auto-refresh every 10 seconds")}
+                        checked={auto}
+                        onChange={(e) => setAuto(e.target.checked)}
+                      />
+                      10s
+                    </label>
+                    <button
+                      title={t("Refresh Admin configuration")}
+                      disabled={busy}
+                      onClick={() => fetchAdmin(remote)}
+                    >
+                      <RefreshCw size={15} />
+                    </button>
+                  </>
+                )}
+                <button
+                  title={t("Download current configuration")}
+                  onClick={download}
+                >
+                  <Download size={16} />
+                </button>
+                <button
+                  title={t("Manage configurations")}
+                  className="manage-config-button"
+                  aria-label={t("Manage configurations")}
+                  onClick={() => {
+                    setError("");
+                    setModal("manage");
+                  }}
+                >
+                  <FolderCog size={17} />
+                </button>
+                <button
+                  className="primary compact-import"
+                  onClick={() => {
+                    setError("");
+                    setModal(true);
+                  }}
+                >
+                  <Upload size={14} />
+                  {t("Import")}
+                </button>
+              </div>
+            </div>
+            {error && !modal && (
+              <div className="error" role="alert">
+                {t(error)}
+              </div>
+            )}
+            <div className="canvas-layout">
+              {side && (
+                <div className="nav-dock">
+                  <aside className="resource-nav">
+                    <div className="nav-title">
+                      {t("Resource navigation")}
+                      <div className="nav-heading-actions">
+                        <button
+                          aria-label={
+                            sortDirection === "asc"
+                              ? t("Ascending; switch to descending")
+                              : t("Descending; switch to ascending")
+                          }
+                          title={
+                            sortDirection === "asc"
+                              ? t("Sorted ascending; click for descending")
+                              : t("Sorted descending; click for ascending")
+                          }
+                          onClick={() =>
+                            setSortDirection((current) =>
+                              current === "asc" ? "desc" : "asc",
+                            )
+                          }
+                        >
+                          {sortDirection === "asc" ? (
+                            <ArrowDownAZ size={16} />
+                          ) : (
+                            <ArrowUpAZ size={16} />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => setSide(false)}
+                          aria-label={t("Collapse navigation")}
+                        >
+                          <PanelLeftClose size={15} />
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      className={
+                        !listener && !chain ? "nav-item active" : "nav-item"
+                      }
+                      onClick={() => changeListener("")}
+                    >
+                      <Network size={15} />
+                      {t("All resources")}
+                      <span>{model.nodes.length}</span>
+                    </button>
+                    <details className="nav-group" open={navGroups.listener}>
+                      <summary
+                        className="nav-section"
+                        onClick={(event) => toggleNavGroup(event, "listener")}
+                      >
+                        <ChevronRight size={15} />
+                        <Radio size={18} strokeWidth={2.2} aria-hidden="true" />
+                        LISTENERS <span>{counts.listener}</span>
+                      </summary>
+                      {orderedResources("listener").map((n) => (
+                        <button
+                          key={n.id}
+                          title={nodeLabel(n)}
+                          className={`nav-item listener-item ${listener === n.id ? "active" : ""}`}
+                          onClick={() => {
+                            changeListener(n.id);
+                          }}
+                        >
+                          <Radio size={14} />
+                          <div>
+                            {nodeLabel(n)}
+                            <small>{address(n.detail)}</small>
+                          </div>
+                        </button>
+                      ))}
+                    </details>
+                    <details
+                      className="nav-group"
+                      open={navGroups.filter_chain}
+                    >
+                      <summary
+                        className="nav-section"
+                        onClick={(event) =>
+                          toggleNavGroup(event, "filter_chain")
+                        }
+                      >
+                        <ChevronRight size={15} />
+                        <Layers size={15} aria-hidden="true" />
+                        FILTER CHAINS <span>{counts.filter_chain}</span>
+                      </summary>
+                      {orderedResources("filter_chain").map((n) => {
+                        const owner = model.nodes.find(
+                          (resource) =>
+                            resource.kind === "listener" &&
+                            n.path.startsWith(`${resource.path}.`),
+                        );
+                        return (
+                          <button
+                            key={n.id}
+                            title={[n.label, owner?.label]
+                              .filter(Boolean)
+                              .join(" · ")}
+                            className={`nav-item listener-item ${chain === n.id || selected?.id === n.id ? "active" : ""}`}
+                            onClick={() => navigateFilterChain(n)}
+                          >
+                            <Layers size={14} aria-hidden="true" />
+                            <div>
+                              {nodeLabel(n)}
+                              {owner && <small>{nodeLabel(owner)}</small>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </details>
+                    <details className="nav-group" open={navGroups.cluster}>
+                      <summary
+                        className="nav-section"
+                        onClick={(event) => toggleNavGroup(event, "cluster")}
+                      >
+                        <ChevronRight size={15} />
+                        <Network size={15} aria-hidden="true" />
+                        CLUSTERS <span>{counts.cluster}</span>
+                      </summary>
+                      {orderedResources("cluster").map((n) => (
+                        <button
+                          key={n.id}
+                          title={nodeLabel(n)}
+                          className={`nav-item listener-item ${selected?.id === n.id ? "active" : ""}`}
+                          onClick={() => navigateCluster(n)}
+                        >
+                          <Network size={14} aria-hidden="true" />
+                          <div>
+                            {nodeLabel(n)}
+                            {n.state !== "unresolved" && (
+                              <small>
+                                {n.detail.type ??
+                                  (
+                                    n.detail.cluster_type ??
+                                    n.detail.clusterType
+                                  )?.name ??
+                                  t("STATIC (default)")}
+                              </small>
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </details>
+                    <details className="nav-group" open={navGroups.endpoint}>
+                      <summary
+                        className="nav-section"
+                        onClick={(event) => toggleNavGroup(event, "endpoint")}
+                      >
+                        <ChevronRight size={15} />
+                        <Server size={15} aria-hidden="true" />
+                        ENDPOINTS <span>{counts.endpoint}</span>
+                      </summary>
+                      {orderedResources("endpoint").map((n) => (
+                        <button
+                          key={n.id}
+                          title={nodeLabel(n)}
+                          className={`nav-item listener-item ${selected?.id === n.id ? "active" : ""}`}
+                          onClick={() => navigateCluster(n)}
+                        >
+                          <Server size={14} aria-hidden="true" />
+                          <div>{nodeLabel(n)}</div>
+                        </button>
+                      ))}
+                    </details>
+                    <div className="nav-section">{t("Legend")}</div>
+                    <div className="legend">
+                      {[
+                        "listener",
+                        "filter_chain",
+                        "match",
+                        "network_filter",
+                        "http_filter",
+                        "route",
+                        "cluster",
+                        "endpoint",
+                      ].map((k) => (
+                        <div key={k}>
+                          <i style={{ background: meta[k][1] }} />
+                          {meta[k][0]}
+                          <span
+                            className="legend-count"
+                            title={t("Resource count in this configuration")}
+                          >
+                            {counts[k] ?? 0}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </aside>
+                  <div
+                    className="nav-resize-handle"
+                    role="separator"
+                    aria-label={t("Resize resource navigation")}
+                    aria-orientation="vertical"
+                    aria-valuemin={160}
+                    aria-valuemax={navMax}
+                    aria-valuenow={displayedNavWidth}
+                    tabIndex={0}
+                    title={t(
+                      "Drag to resize; use arrow keys to adjust; double-click to reset",
+                    )}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      navDrag.current = {
+                        x: e.clientX,
+                        width: displayedNavWidth,
+                      };
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setResizingNav(true);
+                    }}
+                    onPointerMove={(e) => {
+                      if (navDrag.current)
+                        resizeNav(
+                          navDrag.current.width + e.clientX - navDrag.current.x,
+                        );
+                    }}
+                    onPointerUp={(e) => {
+                      navDrag.current = null;
+                      setResizingNav(false);
+                      if (e.currentTarget.hasPointerCapture(e.pointerId))
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }}
+                    onLostPointerCapture={() => {
+                      navDrag.current = null;
+                      setResizingNav(false);
+                    }}
+                    onPointerCancel={() => {
+                      navDrag.current = null;
+                      setResizingNav(false);
+                    }}
+                    onDoubleClick={() => resizeNav(180)}
+                    onKeyDown={(e) => {
+                      if (
+                        !["ArrowLeft", "ArrowRight", "Home", "End"].includes(
+                          e.key,
+                        )
+                      )
+                        return;
+                      e.preventDefault();
+                      resizeNav(
+                        e.key === "Home"
+                          ? 160
+                          : e.key === "End"
+                            ? navMax
+                            : displayedNavWidth +
+                              (e.key === "ArrowRight" ? 10 : -10),
+                      );
+                    }}
+                  />
+                </div>
+              )}
+              <div className="canvas">
+                {!side && (
+                  <button className="expand" onClick={() => setSide(true)}>
+                    {t("Show navigation")}
+                  </button>
+                )}
+                {view === "graph" ? (
+                  <Graph
+                    model={model}
+                    selected={selected}
+                    onSelect={selectResource}
+                    onNodeClick={toggleResourceDetails}
+                    focusTarget={focusTarget}
+                    resetKey={canvasRevision}
+                    query={query}
+                    listener={listener}
+                    chain={chain}
+                    setChain={setChain}
+                  />
+                ) : view === "raw" ? (
+                  <pre
+                    className="raw-view"
+                    aria-label={t("Full JSON configuration")}
+                  >
+                    <JsonCode value={model.raw} />
+                  </pre>
+                ) : (
+                  <div className="resource-list">
+                    {resourceGroups.map(([kind, nodes]) => (
+                      <details
+                        className="resource-group"
+                        key={kind}
+                        open
+                        aria-label={meta[kind]?.[0] || kind}
+                      >
+                        <summary className="resource-group-heading">
+                          <ChevronRight
+                            className="resource-group-chevron"
+                            size={16}
+                          />
+                          <i
+                            style={{
+                              background: (meta[kind] || meta.resource)[1],
+                            }}
+                          />
+                          {meta[kind]?.[0] || kind}
+                          <b>{nodes.length}</b>
+                        </summary>
+                        {nodes.map((n) => (
+                          <button
+                            key={n.id}
+                            onClick={() => toggleResourceDetails(n)}
+                          >
+                            <strong>{nodeLabel(n)}</strong>
+                            <small
+                              title={t(
+                                "Configuration origin, independent of lifecycle state or cluster type",
+                              )}
+                            >
+                              {originLabel(n)}
+                            </small>
+                            <ChevronRight size={15} />
+                          </button>
+                        ))}
+                      </details>
+                    ))}
+                    {!resourceGroups.length && (
+                      <p className="resource-list-empty">
+                        {t("No matching resources")}
+                      </p>
+                    )}
+                  </div>
+                )}
+                {!model.nodes.length && view === "graph" && (
+                  <div className="empty">
+                    {t(
+                      "No graph resources found. Open Full configuration to inspect the input.",
+                    )}
+                  </div>
+                )}
+              </div>
+              {selected && detailsOpen && (
+                <ResizableInspector>
+                  <div className="inspector-heading">
+                    <span>{t("Configuration details")}</span>
+                    <button
+                      onClick={() => setDetailsOpen(false)}
+                      aria-label={t("Close details")}
+                    >
+                      <X size={17} />
+                    </button>
+                  </div>
+                  <span
+                    className="detail-kind"
+                    style={{ color: meta[selected.kind]?.[1] }}
+                  >
+                    {meta[selected.kind]?.[0]}
+                  </span>
+                  <h2>{nodeLabel(selected)}</h2>
+                  {reference && (
+                    <div className="envoy-reference">
+                      <a
+                        href={reference.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("Envoy 1.20 reference")}
+                        <ArrowUpRight size={14} />
+                      </a>
+                      {reference.note && <small>{t(reference.note)}</small>}
+                    </div>
+                  )}
+                  <div className="code-heading">
+                    {t("Configuration")}
+                    <button
+                      title={t("Copy configuration")}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(
+                            JSON.stringify(details, null, 2),
+                          );
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 1500);
+                        } catch {
+                          setError(
+                            "Clipboard unavailable. Copy the configuration manually.",
+                          );
+                        }
+                      }}
+                    >
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                  <ConfigViewer key={selected.id} value={details} />
+                  <div className="related">
+                    <strong>{t("Related resources")}</strong>
+                    {model.edges
+                      .filter(
+                        (e) =>
+                          e.source === selected.id || e.target === selected.id,
+                      )
+                      .map((e) => {
+                        const n = model.nodes.find(
+                          (n) =>
+                            n.id ===
+                            (e.source === selected.id ? e.target : e.source),
+                        );
+                        return (
+                          <button key={e.id} onClick={() => selectResource(n)}>
+                            {e.source === selected.id ? "→" : "←"}{" "}
+                            {short(nodeLabel(n))}
+                            <ChevronRight size={12} />
+                          </button>
+                        );
+                      })}
+                  </div>
+                </ResizableInspector>
+              )}
+            </div>
+          </section>
+        </main>
+      </div>
+      {modal && (
+        <div
+          className={`modal-backdrop ${modal === "manage" ? "config-manager-backdrop" : ""}`}
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !busy && !savingEdit)
+              setModal(false);
+          }}
+        >
+          <section
+            className={`modal ${modal === "manage" ? "config-manager-panel" : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="import-title"
+          >
+            <div className="modal-title">
+              <div>
+                <h2 id="import-title">
+                  {modal === "manage"
+                    ? t("Manage configurations")
+                    : modal === "edit"
+                      ? t("Edit Envoy configuration")
+                      : t("Import Envoy configuration")}
+                </h2>
+                <p>
+                  {modal === "manage"
+                    ? t("Switch, rename, edit, or delete saved configurations.")
+                    : t(
+                        "Connect to a live instance or inspect an offline configuration.",
+                      )}
+                </p>
+              </div>
+              <button
+                onClick={() => setModal(false)}
+                disabled={savingEdit}
+                aria-label={
+                  modal === "manage"
+                    ? t("Close configuration manager")
+                    : modal === "edit"
+                      ? t("Close editor")
+                      : t("Close import")
+                }
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {modal === "manage" ? (
+              <>
+                <section
+                  className="saved-config-library"
+                  aria-label={t("Saved configurations")}
+                >
+                  <h3>{t("Saved configurations")}</h3>
+                  <div className="saved-config-items">
+                    {library.map((item) => (
+                      <div
+                        className={`saved-config-item ${activeConfigId === item.id ? "is-current" : ""}`}
+                        key={item.id}
+                      >
+                        <div>
+                          <input
+                            aria-label={t("Configuration name: {0}", [
+                              item.name,
+                            ])}
+                            defaultValue={item.name}
+                            key={`${item.id}:${item.name}`}
+                            onBlur={(event) => {
+                              if (event.target.value.trim() !== item.name)
+                                renameSavedConfig(item.id, event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter")
+                                event.currentTarget.blur();
+                            }}
+                          />
+                          <small title={item.remote || item.source}>
+                            {item.remote
+                              ? `Admin · ${item.remote}`
+                              : item.source}
+                          </small>
+                        </div>
+                        <button onClick={() => switchConfig(item.id)}>
+                          {activeConfigId === item.id
+                            ? t("Current")
+                            : t("Switch")}
+                        </button>
+                        <button
+                          title={t("Edit configuration")}
+                          aria-label={t("Edit configuration {0}", [item.name])}
+                          onClick={() => editSavedConfig(item)}
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          aria-label={t("Delete configuration {0}", [
+                            item.name,
+                          ])}
+                          onClick={() => deleteSavedConfig(item.id)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {!library.length && (
+                    <p className="config-manager-empty">
+                      {t("No saved configurations. Import one to get started.")}
+                    </p>
+                  )}
+                  <p>
+                    {t(
+                      "Saved only in this browser. Switching Admin configurations loads a saved snapshot without connecting or enabling polling.",
+                    )}
+                  </p>
+                </section>
+                {error && (
+                  <div className="error" role="alert">
+                    {t(error)}
+                  </div>
+                )}
+                <button
+                  className="primary"
+                  onClick={() => {
+                    setError("");
+                    setModal(true);
+                  }}
+                >
+                  <Upload size={15} />
+                  {t("Import configuration")}
+                </button>
+              </>
+            ) : modal === "edit" && editing ? (
+              <>
+                <label className="field-label" htmlFor="edit-config-name">
+                  {t("Configuration name")}
+                </label>
+                <input
+                  className="import-config-name"
+                  id="edit-config-name"
+                  value={editing.name}
+                  disabled={savingEdit}
+                  onChange={(e) =>
+                    setEditing({ ...editing, name: e.target.value })
+                  }
+                />
+                <label className="field-label" htmlFor="edit-config-admin">
+                  {t("Admin address (optional)")}
+                </label>
+                <input
+                  className="import-config-name"
+                  id="edit-config-admin"
+                  value={editing.remote || ""}
+                  disabled={savingEdit}
+                  placeholder={t("Leave blank for an offline configuration")}
+                  onChange={(e) =>
+                    setEditing({ ...editing, remote: e.target.value })
+                  }
+                />
+                <label className="field-label" htmlFor="edit-config-text">
+                  {t("Configuration")}
+                  <span>JSON / YAML</span>
+                </label>
+                <textarea
+                  id="edit-config-text"
+                  value={editing.text}
+                  disabled={savingEdit}
+                  spellCheck={false}
+                  onChange={(e) =>
+                    setEditing({ ...editing, text: e.target.value })
+                  }
+                />
+                <p className="edit-config-note">
+                  {t(
+                    "Changes affect the local copy only, not Envoy. Future Admin refreshes overwrite this snapshot. Auto-refresh is paused while editing.",
+                  )}
+                </p>
+                {error && (
+                  <div className="error" role="alert">
+                    {t(error)}
+                  </div>
+                )}
+                <div className="modal-footer">
+                  <button
+                    disabled={savingEdit}
+                    onClick={() => {
+                      setEditing(null);
+                      setError("");
+                      setModal("manage");
+                    }}
+                  >
+                    {t("Cancel")}
+                  </button>
+                  <button
+                    className="primary"
+                    disabled={savingEdit}
+                    onClick={saveEditedConfig}
+                  >
+                    {savingEdit ? t("Saving…") : t("Save changes")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <label className="field-label" htmlFor="import-name">
+                  {t("Configuration name (optional)")}
+                </label>
+                <input
+                  id="import-name"
+                  className="import-config-name"
+                  value={importName}
+                  onChange={(event) => setImportName(event.target.value)}
+                  placeholder={t("For example: staging sidecar")}
+                />
+                <div className="import-tabs">
+                  {[
+                    ["paste", t("Paste configuration"), FileCode2],
+                    ["upload", t("Upload file"), Upload],
+                    ["admin", t("Admin address"), Radio],
+                  ].map(([id, label, Icon]) => (
+                    <button
+                      key={id}
+                      className={tab === id ? "active" : ""}
+                      onClick={() => {
+                        setTab(id);
+                        setError("");
+                      }}
+                    >
+                      <Icon size={16} />
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {tab === "paste" ? (
+                  <>
+                    <label className="field-label" htmlFor="config-text">
+                      {t("Configuration")}
+                      <span>{t("Auto-detect JSON / YAML")}</span>
+                    </label>
+                    <textarea
+                      id="config-text"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      spellCheck="false"
+                      placeholder={t("Paste bootstrap or config_dump…")}
+                    />
+                  </>
+                ) : tab === "upload" ? (
+                  <label
+                    className="dropzone"
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      upload(e.dataTransfer.files[0]);
+                    }}
+                  >
+                    <Upload size={32} />
+                    <strong>{t("Drop a configuration file here")}</strong>
+                    <span>
+                      {t("Or click to browse · .json / .yaml / .yml")}
+                    </span>
+                    <input
+                      className="file-input-accessible"
+                      aria-label={t("Upload configuration file")}
+                      type="file"
+                      accept=".json,.yaml,.yml"
+                      onChange={(e) => upload(e.target.files[0])}
+                    />
+                    <span className="file-input-label" aria-hidden="true">
+                      {t("Upload file")}
+                    </span>
+                  </label>
+                ) : (
+                  <div className="admin-form">
+                    <label className="field-label" htmlFor="admin-address">
+                      {t("Envoy Admin address")}
+                    </label>
+                    <input
+                      id="admin-address"
+                      value={addressValue}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="http://127.0.0.1:9901"
+                    />
+                    <p>
+                      {t("The server sends a read-only request to")}
+                      <code>/config_dump?include_eds</code>
+                      {t(
+                        ". Local and remote instances reachable from the server are supported. Auto-refresh is available after connecting.",
+                      )}
+                    </p>
+                    <div className="notice">
+                      {t(
+                        "Admin responses may contain sensitive data. Connect only to trusted instances. EnvoyLens does not modify Envoy configuration.",
+                      )}
+                    </div>
+                  </div>
+                )}
+                {error && (
+                  <div className="error" role="alert">
+                    {t(error)}
+                  </div>
+                )}
+                <div className="modal-footer">
+                  <button
+                    onClick={() => {
+                      loadLocal(sample, "Demo configuration");
+                    }}
+                  >
+                    {t("Load demo")}
+                  </button>
+                  {tab !== "upload" && (
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      onClick={() =>
+                        tab === "admin"
+                          ? fetchAdmin()
+                          : loadLocal(text, "Paste configuration")
+                      }
+                    >
+                      {busy
+                        ? t("Loading…")
+                        : tab === "admin"
+                          ? t("Connect and save")
+                          : t("Parse and save")}
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
+createRoot(document.getElementById("root")).render(<App />);
