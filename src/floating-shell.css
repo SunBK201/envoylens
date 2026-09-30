@@ -1193,6 +1193,59 @@ main {
   padding: 0;
 }
 
+.nav-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--glass-line);
+  border-radius: 8px;
+  color: var(--palette-64748b);
+}
+.nav-search:focus-within {
+  border-color: var(--palette-177b64);
+}
+.nav-search > svg {
+  flex: none;
+}
+.nav-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--palette-283749);
+  font: inherit;
+  font-size: 12px;
+  line-height: 22px;
+}
+.floating-shell .resource-nav .nav-search input,
+.floating-shell .resource-nav .nav-search input:focus,
+.floating-shell .resource-nav .nav-search input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+.nav-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+.nav-search button {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--palette-64748b);
+}
+.nav-search-status {
+  margin: 0 4px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--palette-64748b);
+}
+
 /* VS Code-style read-only JSON surface, with a neutral, non-blue palette. */
 pre:has(> .json-code),
 .inspector pre.config-json:has(> .json-code),

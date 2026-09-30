@@ -55,6 +55,10 @@ import ConfigViewer from "./ConfigViewer";
 import { envoyReference } from "./envoy-docs";
 import { retainRefreshView } from "./refresh-view";
 import { sortedResources } from "./resource-sort";
+import {
+  navigationSearchText,
+  filterNavigationResources,
+} from "./navigation-search";
 import { readNavGroups, saveNavGroups } from "./nav-groups";
 import JsonCode from "./JsonCode";
 import ResizableInspector from "./ResizableInspector";
@@ -213,6 +217,17 @@ function App() {
       getItem: (key) => window.localStorage.getItem(key),
     }),
   );
+  const [navQuery, setNavQuery] = useState("");
+  const [searchNavGroups, setSearchNavGroups] = useState({});
+  const navSearchInput = useRef(null);
+  const navSearching = Boolean(navQuery.trim());
+  function changeNavQuery(value) {
+    setNavQuery(value);
+    setSearchNavGroups({});
+  }
+  function navGroupOpen(kind) {
+    return navSearching ? (searchNavGroups[kind] ?? true) : navGroups[kind];
+  }
   useEffect(() => {
     saveNavGroups(
       { setItem: (key, value) => window.localStorage.setItem(key, value) },
@@ -221,6 +236,13 @@ function App() {
   }, [navGroups]);
   function toggleNavGroup(event, kind) {
     event.preventDefault();
+    if (navSearching) {
+      setSearchNavGroups((current) => ({
+        ...current,
+        [kind]: !(current[kind] ?? true),
+      }));
+      return;
+    }
     setNavGroups((current) => ({ ...current, [kind]: !current[kind] }));
   }
   const [sortDirection, setSortDirection] = useState(() => {
@@ -237,18 +259,45 @@ function App() {
       localStorage.setItem("envoylens-nav-sort", sortDirection);
     } catch {}
   }, [sortDirection]);
-  const navigationResources = useMemo(
-    () =>
-      Object.fromEntries(
-        ["listener", "filter_chain", "cluster", "endpoint"].map((kind) => [
-          kind,
-          sortedResources(model.nodes, kind, sortDirection),
+  const navigation = useMemo(() => {
+    const groups = Object.fromEntries(
+      ["listener", "filter_chain", "cluster", "endpoint"].map((kind) => [
+        kind,
+        sortedResources(model.nodes, kind, sortDirection),
+      ]),
+    );
+    const owners = new Map(
+      groups.filter_chain.map((node) => [
+        node.id,
+        groups.listener.find((owner) => node.path.startsWith(`${owner.path}.`)),
+      ]),
+    );
+    const index = new Map(
+      Object.values(groups).flatMap((nodes) =>
+        nodes.map((node) => [
+          node.id,
+          navigationSearchText(node, owners.get(node.id)),
         ]),
       ),
-    [model, sortDirection],
+    );
+    return { groups, owners, index };
+  }, [model, sortDirection, language]);
+  const navigationResources = useMemo(
+    () =>
+      filterNavigationResources(navigation.groups, navigation.index, navQuery),
+    [navigation, navQuery],
   );
+  const navMatchCount = Object.values(navigationResources).reduce(
+    (sum, nodes) => sum + nodes.length,
+    0,
+  );
+  function navCount(kind) {
+    return navSearching
+      ? `${navigationResources[kind].length}/${navigation.groups[kind].length}`
+      : navigation.groups[kind].length;
+  }
   function orderedResources(kind) {
-    return navGroups[kind] ? navigationResources[kind] : [];
+    return navGroupOpen(kind) ? navigationResources[kind] : [];
   }
   function changeListener(id) {
     setCanvasRevision((value) => value + 1);
@@ -858,7 +907,10 @@ function App() {
             <div className="canvas-layout">
               {side && (
                 <div className="nav-dock">
-                  <aside className="resource-nav">
+                  <aside
+                    className="resource-nav"
+                    aria-label={t("Resource navigation")}
+                  >
                     <div className="nav-title">
                       {t("Resource navigation")}
                       <div className="nav-heading-actions">
@@ -893,6 +945,47 @@ function App() {
                         </button>
                       </div>
                     </div>
+                    <div className="nav-search">
+                      <Search size={14} aria-hidden="true" />
+                      <input
+                        ref={navSearchInput}
+                        type="search"
+                        value={navQuery}
+                        onChange={(event) => changeNavQuery(event.target.value)}
+                        placeholder={t("Filter resources…")}
+                        aria-label={t("Filter navigation resources")}
+                        onKeyDown={(event) => {
+                          if (
+                            event.key === "Escape" &&
+                            navQuery &&
+                            !event.isComposing
+                          ) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            changeNavQuery("");
+                          }
+                        }}
+                      />
+                      {navQuery && (
+                        <button
+                          type="button"
+                          aria-label={t("Clear navigation search")}
+                          onClick={() => {
+                            changeNavQuery("");
+                            navSearchInput.current?.focus();
+                          }}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                    {navSearching && (
+                      <p className="nav-search-status" role="status">
+                        {navMatchCount
+                          ? t("{0} matching resources", [navMatchCount])
+                          : t("No matching resources")}
+                      </p>
+                    )}
                     <button
                       className={
                         !listener && !chain ? "nav-item active" : "nav-item"
@@ -903,13 +996,19 @@ function App() {
                       {t("All resources")}
                       <span>{model.nodes.length}</span>
                     </button>
-                    <details className="nav-group" open={navGroups.listener}>
+                    <details
+                      className="nav-group"
+                      open={navGroupOpen("listener")}
+                      hidden={
+                        navSearching && !navigationResources.listener.length
+                      }
+                    >
                       <summary
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "listener")}
                       >
                         <Radio size={18} strokeWidth={2.2} aria-hidden="true" />
-                        LISTENERS <span>{counts.listener}</span>
+                        LISTENERS <span>{navCount("listener")}</span>
                       </summary>
                       {orderedResources("listener").map((n) => (
                         <button
@@ -930,7 +1029,10 @@ function App() {
                     </details>
                     <details
                       className="nav-group"
-                      open={navGroups.filter_chain}
+                      open={navGroupOpen("filter_chain")}
+                      hidden={
+                        navSearching && !navigationResources.filter_chain.length
+                      }
                     >
                       <summary
                         className="nav-section"
@@ -939,14 +1041,10 @@ function App() {
                         }
                       >
                         <Layers size={15} aria-hidden="true" />
-                        FILTER CHAINS <span>{counts.filter_chain}</span>
+                        FILTER CHAINS <span>{navCount("filter_chain")}</span>
                       </summary>
                       {orderedResources("filter_chain").map((n) => {
-                        const owner = model.nodes.find(
-                          (resource) =>
-                            resource.kind === "listener" &&
-                            n.path.startsWith(`${resource.path}.`),
-                        );
+                        const owner = navigation.owners.get(n.id);
                         return (
                           <button
                             key={n.id}
@@ -965,13 +1063,19 @@ function App() {
                         );
                       })}
                     </details>
-                    <details className="nav-group" open={navGroups.cluster}>
+                    <details
+                      className="nav-group"
+                      open={navGroupOpen("cluster")}
+                      hidden={
+                        navSearching && !navigationResources.cluster.length
+                      }
+                    >
                       <summary
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "cluster")}
                       >
                         <Network size={15} aria-hidden="true" />
-                        CLUSTERS <span>{counts.cluster}</span>
+                        CLUSTERS <span>{navCount("cluster")}</span>
                       </summary>
                       {orderedResources("cluster").map((n) => (
                         <button
@@ -997,13 +1101,19 @@ function App() {
                         </button>
                       ))}
                     </details>
-                    <details className="nav-group" open={navGroups.endpoint}>
+                    <details
+                      className="nav-group"
+                      open={navGroupOpen("endpoint")}
+                      hidden={
+                        navSearching && !navigationResources.endpoint.length
+                      }
+                    >
                       <summary
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "endpoint")}
                       >
                         <Server size={15} aria-hidden="true" />
-                        ENDPOINTS <span>{counts.endpoint}</span>
+                        ENDPOINTS <span>{navCount("endpoint")}</span>
                       </summary>
                       {orderedResources("endpoint").map((n) => (
                         <button
@@ -1017,30 +1127,36 @@ function App() {
                         </button>
                       ))}
                     </details>
-                    <div className="nav-section">{t("Legend")}</div>
-                    <div className="legend">
-                      {[
-                        "listener",
-                        "filter_chain",
-                        "match",
-                        "network_filter",
-                        "http_filter",
-                        "route",
-                        "cluster",
-                        "endpoint",
-                      ].map((k) => (
-                        <div key={k}>
-                          <i style={{ background: meta[k][1] }} />
-                          {meta[k][0]}
-                          <span
-                            className="legend-count"
-                            title={t("Resource count in this configuration")}
-                          >
-                            {counts[k] ?? 0}
-                          </span>
+                    {!navSearching && (
+                      <>
+                        <div className="nav-section">{t("Legend")}</div>
+                        <div className="legend">
+                          {[
+                            "listener",
+                            "filter_chain",
+                            "match",
+                            "network_filter",
+                            "http_filter",
+                            "route",
+                            "cluster",
+                            "endpoint",
+                          ].map((k) => (
+                            <div key={k}>
+                              <i style={{ background: meta[k][1] }} />
+                              {meta[k][0]}
+                              <span
+                                className="legend-count"
+                                title={t(
+                                  "Resource count in this configuration",
+                                )}
+                              >
+                                {counts[k] ?? 0}
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                    </div>
+                      </>
+                    )}
                   </aside>
                   <div
                     className="nav-resize-handle"

@@ -226,5 +226,9 @@
   "Dynamic filter {0} uses ECDS; only subscription details are currently available.": "Dynamic filter {0} uses ECDS; only subscription details are currently available.",
   "Listener {0} uses the matcher API; inspect details for the actual matching rules.": "Listener {0} uses the matcher API; inspect details for the actual matching rules.",
   "Warming / draining resources describe lifecycle state and may not accept new requests.": "Warming / draining resources describe lifecycle state and may not accept new requests.",
-  "No drawable Listener, Route, or Cluster found; inspect the full raw configuration.": "No drawable Listener, Route, or Cluster found; inspect the full raw configuration."
+  "No drawable Listener, Route, or Cluster found; inspect the full raw configuration.": "No drawable Listener, Route, or Cluster found; inspect the full raw configuration.",
+  "Filter resources…": "Filter resources…",
+  "Filter navigation resources": "Filter navigation resources",
+  "Clear navigation search": "Clear navigation search",
+  "{0} matching resources": "{0} matching resources"
 }
