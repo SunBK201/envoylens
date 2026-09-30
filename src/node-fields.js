@@ -45,6 +45,10 @@ export function nodeFields(n) {
       add("cluster_specifier_plugin", get(a, "cluster_specifier_plugin"));
   };
   switch (n.kind) {
+    case "target_group":
+      add("clusters", d.clusters);
+      add("resources", d.resources);
+      break;
     case "listener": {
       const socket = get(d.address, "socket_address");
       add("address", socket?.address ?? d.address?.pipe?.path);

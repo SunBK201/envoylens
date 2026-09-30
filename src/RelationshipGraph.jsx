@@ -6,7 +6,7 @@ import React, {
   useEffect,
   useLayoutEffect,
 } from "react";
-import { ChevronDown, Scan } from "lucide-react";
+import { Scan } from "lucide-react";
 import NodePreview from "./NodePreview";
 import { layoutGraph, graphGeometry, displayTitle } from "./layout";
 import { graphConnections } from "./graph-connections";
@@ -37,6 +37,12 @@ function reach(start, edges, reverse = false) {
 }
 export default function RelationshipGraph({
   model,
+  searchNodes = model.nodes,
+  routingIndex,
+  onLocate,
+  active = true,
+  viewportState,
+  restoreViewport,
   selected,
   onSelect,
   onNodeClick,
@@ -45,7 +51,6 @@ export default function RelationshipGraph({
   query,
   listener,
   chain,
-  setChain,
   meta,
 }) {
   const [preview, setPreview] = useState(null);
@@ -69,7 +74,7 @@ export default function RelationshipGraph({
   useEffect(() => {
     closePreview();
     return cancelPreviewTimer;
-  }, [model, listener, chain]);
+  }, [model, listener, chain, active]);
   useEffect(() => {
     const close = (e) => {
       if (e.key === "Escape") closePreview();
@@ -213,18 +218,8 @@ export default function RelationshipGraph({
     hitIndex.current = -1;
   }, [query]);
   const graph = useMemo(() => {
-    let ids = listener
-      ? reach(listener, model.edges)
-      : new Set(model.nodes.map((n) => n.id));
-    if (chain) {
-      const relevant = new Set([
-        ...reach(chain, model.edges),
-        ...reach(chain, model.edges, true),
-      ]);
-      ids = new Set([...ids].filter((id) => relevant.has(id)));
-    }
-    const nodes = model.nodes.filter((n) => ids.has(n.id)),
-      edges = model.edges.filter((e) => ids.has(e.source) && ids.has(e.target));
+    const nodes = model.nodes,
+      edges = model.edges;
     const geometry = graphGeometry(nodes, edges);
     const positions = layoutGraph(nodes, edges, geometry);
     const placed = nodes.map((n) => ({
@@ -248,11 +243,11 @@ export default function RelationshipGraph({
         ...placed.map((n) => n.y + geometry.cardHeight + CANVAS_PADDING),
       ),
     };
-  }, [model, listener, chain]);
+  }, [model]);
   useEffect(() => {
     // Keep the extra drag margin offscreen initially. Small graphs still center.
     // Do not reset this position on Admin refresh or ordinary zoom changes.
-    if (focusTarget) return;
+    if (focusTarget || !active) return;
     const frame = requestAnimationFrame(() => {
       const el = viewport.current;
       if (!el) return;
@@ -270,16 +265,52 @@ export default function RelationshipGraph({
     });
     return () => cancelAnimationFrame(frame);
   }, [resetKey, listener, chain]);
+  const consumedFocus = useRef(null);
+  const savedViewport = useRef(null);
+  const appliedRestore = useRef(null);
+  function recordViewport() {
+    if (!active || !viewport.current?.clientWidth) return;
+    const state = {
+      zoom: zoomRef.current,
+      left: viewport.current.scrollLeft,
+      top: viewport.current.scrollTop,
+    };
+    savedViewport.current = state;
+    if (viewportState) viewportState.current = state;
+  }
+  useLayoutEffect(() => {
+    if (!active || !viewport.current) return;
+    const restore =
+      restoreViewport && appliedRestore.current !== restoreViewport;
+    const state = restore ? restoreViewport : savedViewport.current;
+    if (restore) appliedRestore.current = restoreViewport;
+    if (state) {
+      setZoom(state.zoom);
+      const frame = requestAnimationFrame(() =>
+        viewport.current?.scrollTo(state.left, state.top),
+      );
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [active, restoreViewport]);
   useEffect(() => {
-    if (!focusTarget) return;
-    const node = graph.byId.get(focusTarget.id);
-    const el = viewport.current;
+    if (active) recordViewport();
+  }, [zoom]);
+  useEffect(() => {
+    if (!active || !focusTarget || consumedFocus.current === focusTarget)
+      return;
+    const node = graph.byId.get(focusTarget.id),
+      el = viewport.current;
     if (!node || !el) return;
-    el.scrollTo({
-      left: Math.max(0, node.x * zoom - el.clientWidth / 3),
-      top: Math.max(0, node.y * zoom - el.clientHeight / 3),
+    const frame = requestAnimationFrame(() => {
+      el.scrollTo({
+        left: Math.max(0, node.x * zoomRef.current - el.clientWidth / 3),
+        top: Math.max(0, node.y * zoomRef.current - el.clientHeight / 3),
+      });
+      consumedFocus.current = focusTarget;
+      recordViewport();
     });
-  }, [focusTarget, graph]);
+    return () => cancelAnimationFrame(frame);
+  }, [focusTarget, graph, active]);
   const connections = useMemo(() => graphConnections(graph), [graph]);
   const [visibleBounds, setVisibleBounds] = useState({
     left: 0,
@@ -289,6 +320,7 @@ export default function RelationshipGraph({
   });
   useLayoutEffect(() => {
     const el = viewport.current;
+    if (!active) return;
     let frame = 0;
     const measure = () => {
       frame = 0;
@@ -321,7 +353,7 @@ export default function RelationshipGraph({
       observer.disconnect();
       el.removeEventListener("scroll", schedule);
     };
-  }, [graph, zoom]);
+  }, [graph, zoom, active]);
   const visible = useMemo(
     () => visibleGraph(graph, connections, visibleBounds),
     [graph, connections, visibleBounds],
@@ -347,18 +379,25 @@ export default function RelationshipGraph({
   const hits = useMemo(
     () =>
       query.trim()
-        ? graph.nodes.filter((n) =>
-            (n.label + " " + n.kind + " " + summary(n))
+        ? searchNodes.filter((n) =>
+            (
+              routingIndex?.entries.get(n.routingKey)?.search ||
+              n.label + " " + n.kind + " " + summary(n)
+            )
               .toLowerCase()
               .includes(query.trim().toLowerCase()),
           )
         : [],
-    [graph, query],
+    [searchNodes, routingIndex, query],
   );
   const hitIds = new Set(hits.map((n) => n.id));
   function focusNext() {
     if (!hits.length) return;
     const n = hits[++hitIndex.current % hits.length];
+    if (onLocate) {
+      onLocate(n);
+      return;
+    }
     onSelect(n);
     viewport.current?.scrollTo({
       left: Math.max(0, n.x * zoom - viewport.current.clientWidth / 3),
@@ -369,6 +408,7 @@ export default function RelationshipGraph({
   useEffect(() => {
     const handler = (e) => {
       if (
+        active &&
         e.key === "Enter" &&
         e.target.getAttribute?.("data-resource-search") === "true"
       )
@@ -376,13 +416,7 @@ export default function RelationshipGraph({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [hits, zoom]);
-  const chains = useMemo(() => {
-    const reachable = listener ? reach(listener, model.edges) : null;
-    return model.nodes.filter(
-      (n) => n.kind === "filter_chain" && (!reachable || reachable.has(n.id)),
-    );
-  }, [model, listener]);
+  }, [hits, zoom, active, onLocate]);
   return (
     <div className="relationship-graph">
       {preview && (
@@ -395,41 +429,6 @@ export default function RelationshipGraph({
           onClose={closePreview}
         />
       )}
-      <div className="relationship-toolbar filter-chain-toolbar">
-        <label>
-          <span className="filter-chain-label">FilterChain</span>
-          <span className="chain-select">
-            <select
-              aria-label={t("Filter by filter chain")}
-              value={chain}
-              onPointerDown={(event) => {
-                event.currentTarget.dataset.pointerSelection = "true";
-              }}
-              onKeyDown={(event) => {
-                delete event.currentTarget.dataset.pointerSelection;
-              }}
-              onBlur={(event) => {
-                delete event.currentTarget.dataset.pointerSelection;
-              }}
-              onChange={(e) => {
-                setChain(e.target.value);
-                onSelect(null);
-                viewport.current?.scrollTo(0, 0);
-                if (e.currentTarget.dataset.pointerSelection)
-                  e.currentTarget.blur();
-              }}
-            >
-              <option value="">{t("All filter chains")}</option>
-              {chains.map((n) => (
-                <option key={n.id} value={n.id}>
-                  {nodeLabel(n)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={15} aria-hidden="true" />
-          </span>
-        </label>
-      </div>
       <div
         className="relationship-toolbar zoom-toolbar"
         role="group"
@@ -473,7 +472,10 @@ export default function RelationshipGraph({
       <div
         className={`relationship-viewport${panning ? " is-panning" : ""}`}
         ref={viewport}
-        onScroll={closePreview}
+        onScroll={() => {
+          closePreview();
+          recordViewport();
+        }}
         onPointerDown={startPan}
         onPointerMove={movePan}
         onPointerUp={endPan}
@@ -576,6 +578,8 @@ export default function RelationshipGraph({
             {visible.nodes.map((n) => (
               <button
                 key={n.id}
+                data-node-id={n.id}
+                data-node-kind={n.kind}
                 className={`relationship-node ${selected?.id === n.id ? "selected" : ""} ${highlighted && !highlighted.has(n.id) ? "dimmed" : ""} ${hitIds.has(n.id) ? "hit" : ""} ${n.state === "unresolved" ? "missing" : ""}`}
                 style={{
                   left: n.x,

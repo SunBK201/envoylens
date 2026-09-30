@@ -758,68 +758,9 @@ main {
 .floating-shell .relationship-toolbar label {
   align-items: center;
 }
-.floating-shell .filter-chain-toolbar {
-  background: var(--palette-white);
-  padding: 5px 8px;
-}
-.floating-shell .filter-chain-toolbar label {
-  gap: 4px;
-  font-size: 13px;
-  line-height: 20px;
-}
-.filter-chain-label {
-  display: inline-flex;
-  align-items: center;
-  height: 32px;
-  padding-left: 4px;
-}
-.chain-select {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-}
-.chain-select > svg {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  right: 9px;
-  pointer-events: none;
-}
-.floating-shell .relationship-toolbar .chain-select select {
-  appearance: none;
-  -webkit-appearance: none;
-  margin: 0;
-  height: 32px;
-  padding: 5px 30px 5px 8px;
-  font: inherit;
-  line-height: 20px;
-  max-width: 240px;
-  border: 1px solid transparent;
-}
 .floating-shell .relationship-toolbar button {
   height: 32px;
   line-height: 20px;
-}
-.floating-shell .relationship-toolbar .chain-select select {
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
-.floating-shell .relationship-toolbar .chain-select select:hover {
-  background-color: var(--palette-eaf0f3);
-  border-color: var(--glass-line);
-}
-.floating-shell .relationship-toolbar .chain-select select:focus {
-  outline: none;
-  box-shadow: none;
-}
-.floating-shell .relationship-toolbar .chain-select select:focus-visible:not([data-pointer-selection]) {
-  outline: 2px solid #898983;
-  outline-offset: -2px;
-}
-@media (max-width: 900px) {
-  .floating-shell .relationship-toolbar .chain-select select {
-    max-width: 150px;
-  }
 }
 
 .node-preview {
@@ -1116,7 +1057,9 @@ main {
   outline: none;
   box-shadow: none;
 }
-.floating-shell .source-actions .saved-config-switch:focus-visible:not([data-pointer-selection]) {
+.floating-shell
+  .source-actions
+  .saved-config-switch:focus-visible:not([data-pointer-selection]) {
   outline: 2px solid #898983;
   outline-offset: -2px;
 }
@@ -1274,7 +1217,12 @@ pre:has(> .json-code),
   width: max-content;
   min-width: 100%;
   padding: 0;
-  font: 13px/22px "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font:
+    13px/22px "SFMono-Regular",
+    Consolas,
+    "Liberation Mono",
+    Menlo,
+    monospace;
   color: var(--editor-fg);
 }
 .json-code-line {
@@ -1306,8 +1254,13 @@ pre:has(> .json-code),
   padding-right: 8px;
   font-variant-numeric: tabular-nums;
 }
-.json-line-number::before { content: attr(data-line); }
-.json-fold-slot { width: 22px; flex: none; }
+.json-line-number::before {
+  content: attr(data-line);
+}
+.json-fold-slot {
+  width: 22px;
+  flex: none;
+}
 .json-fold-toggle {
   position: static;
   display: inline-flex;
@@ -1333,7 +1286,11 @@ pre:has(> .json-code),
   display: inline-block;
   height: 22px;
   vertical-align: top;
-  background: repeating-linear-gradient(to right, var(--editor-guide) 0 1px, transparent 1px 2ch);
+  background: repeating-linear-gradient(
+    to right,
+    var(--editor-guide) 0 1px,
+    transparent 1px 2ch
+  );
 }
 .json-fold-summary {
   display: inline;
@@ -1347,15 +1304,32 @@ pre:has(> .json-code),
   color: var(--editor-gutter);
   vertical-align: baseline;
 }
-.json-code .json-key { color: #795e26; }
-.json-code .json-string { color: #42713d; }
-.json-code .json-number { color: #92621d; }
-.json-code .json-boolean, .json-code .json-null { color: #88528b; }
-:root[data-theme="dark"] .json-code .json-key { color: #d9c69c; }
-:root[data-theme="dark"] .json-code .json-string { color: #ce9178; }
-:root[data-theme="dark"] .json-code .json-number { color: #b5cea8; }
+.json-code .json-key {
+  color: #795e26;
+}
+.json-code .json-string {
+  color: #42713d;
+}
+.json-code .json-number {
+  color: #92621d;
+}
+.json-code .json-boolean,
+.json-code .json-null {
+  color: #88528b;
+}
+:root[data-theme="dark"] .json-code .json-key {
+  color: #d9c69c;
+}
+:root[data-theme="dark"] .json-code .json-string {
+  color: #ce9178;
+}
+:root[data-theme="dark"] .json-code .json-number {
+  color: #b5cea8;
+}
 :root[data-theme="dark"] .json-code .json-boolean,
-:root[data-theme="dark"] .json-code .json-null { color: #c8a2c8; }
+:root[data-theme="dark"] .json-code .json-null {
+  color: #c8a2c8;
+}
 
 .floating-shell .source-actions .language-toggle {
   min-width: 32px;
@@ -1363,7 +1337,9 @@ pre:has(> .json-code),
   font-weight: 600;
   white-space: nowrap;
 }
-html[lang="en"] .config-manager-panel { width: min(580px, calc(100vw - 24px)); }
+html[lang="en"] .config-manager-panel {
+  width: min(580px, calc(100vw - 24px));
+}
 html[lang="en"] .floating-shell .explorer-header .view-tabs button {
   padding-inline: 7px;
   white-space: nowrap;

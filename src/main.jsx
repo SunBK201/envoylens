@@ -52,6 +52,17 @@ import { configIdentity, restoreView, saveView } from "./view-storage";
 import { sample } from "./sample";
 import RelationshipGraph, { summary } from "./RelationshipGraph";
 import ConfigViewer from "./ConfigViewer";
+import RouteWorkbench, { RouteGraphControls } from "./RouteWorkbench";
+import {
+  buildRoutingIndex,
+  routingScope,
+  shouldCollapseRouting,
+  resolveRoutingSelection,
+  projectRoutingGraph,
+  selectionForEntry,
+  retainRoutingState,
+} from "./routing-model";
+import "./routing.css";
 import { envoyReference } from "./envoy-docs";
 import { retainRefreshView } from "./refresh-view";
 import { sortedResources } from "./resource-sort";
@@ -86,6 +97,7 @@ const meta = {
   action: ["Response", "#92958a"],
   dynamic: ["Dynamic", "#ba8870"],
   resource: ["Resource", "#92958a"],
+  target_group: ["Target summary", "#a38369"],
 };
 const short = (s) =>
   s?.replace(/^envoy\.filters\.(network|http|listener)\./, "") || "Unnamed";
@@ -137,7 +149,9 @@ function App() {
     [view, setView] = useState(() => {
       try {
         const saved = window.localStorage.getItem("envoylens-active-view");
-        return ["graph", "list", "raw"].includes(saved) ? saved : "graph";
+        return ["graph", "routes", "list", "raw"].includes(saved)
+          ? saved
+          : "graph";
       } catch {
         return "graph";
       }
@@ -160,10 +174,37 @@ function App() {
   const [editing, setEditing] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [canvasRevision, setCanvasRevision] = useState(0);
+  const [routing, setRouting] = useState({
+    selection: {},
+    expanded: [],
+    focusedRoute: "",
+    keepBranches: true,
+  });
+  const routingIndex = useMemo(() => buildRoutingIndex(model), [model]);
+  const routeScope = useMemo(
+    () => routingScope(routingIndex, listener, chain),
+    [routingIndex, listener, chain],
+  );
+  const routingSelection = useMemo(
+    () =>
+      resolveRoutingSelection(
+        routingIndex,
+        routeScope.configs,
+        routing.selection,
+      ),
+    [routingIndex, routeScope, routing.selection],
+  );
+  const graphViewport = useRef(null),
+    graphReturn = useRef(null),
+    graphSelection = useRef(null);
+  if (view === "graph" && !routing.focusedRoute)
+    graphSelection.current = selected;
+  const [restoreGraphViewport, setRestoreGraphViewport] = useState(null);
   const currentView = useRef(null);
   currentView.current = {
     activeConfigId,
     model,
+    routingIndex,
     listener,
     chain,
     selected,
@@ -299,7 +340,13 @@ function App() {
   function orderedResources(kind) {
     return navGroupOpen(kind) ? navigationResources[kind] : [];
   }
+  function resetRoutingGraph() {
+    setRouting((current) => ({ ...current, expanded: [], focusedRoute: "" }));
+    graphReturn.current = null;
+    setRestoreGraphViewport(null);
+  }
   function changeListener(id) {
+    resetRoutingGraph();
     setCanvasRevision((value) => value + 1);
     setFocusTarget(null);
     setListener(id);
@@ -309,6 +356,7 @@ function App() {
   }
   const [focusTarget, setFocusTarget] = useState(null);
   function navigateCluster(node) {
+    resetRoutingGraph();
     setListener("");
     setChain("");
     setQuery("");
@@ -317,6 +365,7 @@ function App() {
     setFocusTarget({ id: node.id });
   }
   function navigateFilterChain(node) {
+    resetRoutingGraph();
     setListener("");
     setChain(node.id);
     setQuery("");
@@ -325,13 +374,107 @@ function App() {
     setFocusTarget({ id: node.id });
   }
   function selectResource(node, openDetails = true) {
+    node =
+      routingIndex.byId.get(routingIndex.canonicalId.get(node?.id)) || node;
     setSelected(node);
     setDetailsOpen(Boolean(node) && openDetails);
   }
   function toggleResourceDetails(node) {
+    node =
+      routingIndex.byId.get(routingIndex.canonicalId.get(node?.id)) || node;
     const next = selected?.id === node.id ? null : node;
     setSelected(next);
     setDetailsOpen(Boolean(next));
+  }
+  const graphModel = useMemo(
+    () =>
+      projectRoutingGraph(routingIndex, routeScope, {
+        ...routing,
+        revealId: focusTarget?.id,
+      }),
+    [
+      routingIndex,
+      routeScope,
+      routing.expanded,
+      routing.focusedRoute,
+      focusTarget,
+    ],
+  );
+  function changeRoutingSelection(selection) {
+    setRouting((current) => ({ ...current, selection }));
+  }
+  function browseRoutes(entry) {
+    if (entry) changeRoutingSelection(selectionForEntry(entry));
+    setDetailsOpen(false);
+    setView("routes");
+  }
+  function handleGraphNodeClick(node) {
+    if (node.configKey) {
+      browseRoutes(routingIndex.entries.get(node.configKey));
+      return;
+    }
+    const entry = routingIndex.entries.get(node.routingKey);
+    if (entry) changeRoutingSelection(selectionForEntry(entry));
+    if (["route_config", "virtual_host"].includes(node.kind))
+      selectResource(node, false);
+    else toggleResourceDetails(node);
+  }
+  function expandHost(key) {
+    setRouting((current) => ({
+      ...current,
+      focusedRoute: "",
+      expanded: [
+        ...(current.keepBranches
+          ? current.expanded.filter((item) => item !== key)
+          : []),
+        key,
+      ],
+    }));
+    graphReturn.current = null;
+    const node = routingIndex.entries.get(key)?.node;
+    setFocusTarget(node ? { id: node.id } : null);
+    setRestoreGraphViewport(null);
+    setDetailsOpen(false);
+  }
+  function showRouteInGraph(entry, target = entry.node) {
+    if (!routing.focusedRoute)
+      graphReturn.current = {
+        expanded: routing.expanded,
+        selected: graphSelection.current,
+        viewport: graphViewport.current && { ...graphViewport.current },
+      };
+    setRouting((current) => ({
+      ...current,
+      selection: selectionForEntry(entry),
+      focusedRoute: entry.key,
+    }));
+    selectResource(target, false);
+    setFocusTarget({ id: target.id });
+    setRestoreGraphViewport(null);
+    setView("graph");
+  }
+  function returnToPreviousGraph() {
+    const previous = graphReturn.current;
+    setRouting((current) => ({
+      ...current,
+      focusedRoute: "",
+      expanded: previous?.expanded || current.expanded,
+    }));
+    setFocusTarget(null);
+    setSelected(previous?.selected || null);
+    setDetailsOpen(false);
+    setRestoreGraphViewport(
+      previous?.viewport ? { ...previous.viewport } : null,
+    );
+    graphReturn.current = null;
+  }
+  function locateSearchResult(node) {
+    const entry = routingIndex.entries.get(node.routingKey);
+    if (entry) browseRoutes(entry);
+    else {
+      selectResource(node);
+      setFocusTarget({ id: node.id });
+    }
   }
   function install(content, name, options = {}) {
     setFocusTarget(null);
@@ -340,6 +483,26 @@ function App() {
     setIdentity(configIdentity(content));
     setSource(name);
     if (options.preserveView) {
+      const nextIndex = buildRoutingIndex(m);
+      setRouting((current) =>
+        retainRoutingState(
+          currentView.current.routingIndex,
+          nextIndex,
+          current,
+        ),
+      );
+      if (graphReturn.current) {
+        graphReturn.current.expanded = retainRoutingState(
+          currentView.current.routingIndex,
+          nextIndex,
+          {
+            selection: {},
+            expanded: graphReturn.current.expanded,
+            focusedRoute: "",
+          },
+        ).expanded;
+        graphReturn.current.selected = null;
+      }
       const current = currentView.current;
       const retained = retainRefreshView(current.model, m, current);
       setListener(retained.listener);
@@ -347,6 +510,14 @@ function App() {
       setSelected(retained.selected);
       setDetailsOpen(retained.detailsOpen);
     } else {
+      setRouting({
+        selection: {},
+        expanded: [],
+        focusedRoute: "",
+        keepBranches: true,
+      });
+      graphReturn.current = null;
+      setRestoreGraphViewport(null);
       setCanvasRevision((value) => value + 1);
       setSelected(null);
       setDetailsOpen(false);
@@ -634,17 +805,24 @@ function App() {
     };
   }, [modal, savingEdit]);
   useEffect(() => {
-    if ((!detailsOpen && !selected) || modal) return;
+    if ((view !== "routes" && !detailsOpen && !selected) || modal) return;
     const handler = (event) => {
-      if (event.key === "Escape" && !event.isComposing) {
+      if (
+        event.key === "Escape" &&
+        !event.isComposing &&
+        !event.defaultPrevented
+      ) {
         if (event.repeat) return;
-        if (detailsOpen) setDetailsOpen(false);
+        if (view === "routes") {
+          event.preventDefault();
+          setView("graph");
+        } else if (detailsOpen) setDetailsOpen(false);
         else setSelected(null);
       }
     };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [detailsOpen, selected, modal]);
+  }, [detailsOpen, selected, modal, view]);
   const resourceGroups = useMemo(() => {
     if (view !== "list") return [];
     const groups = new Map(Object.keys(meta).map((kind) => [kind, []]));
@@ -671,6 +849,7 @@ function App() {
     }
     const page = {
       graph: "Graph",
+      routes: "Route workbench",
       list: "Resources",
       raw: "Full configuration",
     }[view];
@@ -743,6 +922,13 @@ function App() {
                     {t("Graph")}
                   </button>
                   <button
+                    className={view === "routes" ? "active" : ""}
+                    onClick={() => browseRoutes()}
+                  >
+                    <Layers size={15} aria-hidden="true" />
+                    {t("Browse routes")}
+                  </button>
+                  <button
                     className={view === "list" ? "active" : ""}
                     onClick={() => setView("list")}
                   >
@@ -775,7 +961,7 @@ function App() {
                     </button>
                   )}
                 </div>
-                {selected && (
+                {selected && view !== "routes" && (
                   <button
                     className="details-toggle"
                     aria-expanded={detailsOpen}
@@ -957,6 +1143,7 @@ function App() {
                         onKeyDown={(event) => {
                           if (
                             event.key === "Escape" &&
+                            view !== "routes" &&
                             navQuery &&
                             !event.isComposing
                           ) {
@@ -1227,27 +1414,87 @@ function App() {
                     {t("Show navigation")}
                   </button>
                 )}
-                {view === "graph" ? (
+                <div className="routing-graph-view" hidden={view !== "graph"}>
                   <Graph
-                    model={model}
+                    model={graphModel}
+                    searchNodes={routeScope.nodes}
+                    routingIndex={routingIndex}
+                    onLocate={locateSearchResult}
+                    active={view === "graph"}
+                    viewportState={graphViewport}
+                    restoreViewport={restoreGraphViewport}
                     selected={selected}
                     onSelect={selectResource}
-                    onNodeClick={toggleResourceDetails}
+                    onNodeClick={handleGraphNodeClick}
                     focusTarget={focusTarget}
                     resetKey={canvasRevision}
                     query={query}
                     listener={listener}
                     chain={chain}
-                    setChain={setChain}
                   />
-                ) : view === "raw" ? (
+                  <RouteGraphControls
+                    index={routingIndex}
+                    configs={routeScope.configs}
+                    selection={routingSelection}
+                    onChange={changeRoutingSelection}
+                    expanded={routing.expanded}
+                    canCollapse={shouldCollapseRouting(routeScope)}
+                    hostSelected={
+                      Boolean(routing.selection.host) &&
+                      routing.selection.host === routingSelection.host
+                    }
+                    keepBranches={routing.keepBranches}
+                    onKeepBranches={(value) =>
+                      setRouting((current) => ({
+                        ...current,
+                        keepBranches: value,
+                      }))
+                    }
+                    onExpand={expandHost}
+                    onCollapse={() => {
+                      resetRoutingGraph();
+                      changeRoutingSelection({
+                        config: routingSelection.config,
+                        host: "",
+                        route: "",
+                      });
+                      setFocusTarget(null);
+                    }}
+                    onBrowse={() => browseRoutes()}
+                    focusedRoute={routing.focusedRoute}
+                    onReturn={returnToPreviousGraph}
+                  />
+                </div>
+                <div
+                  hidden={view !== "routes"}
+                  className="routing-workbench-view"
+                >
+                  <RouteWorkbench
+                    index={routingIndex}
+                    configs={routeScope.configs}
+                    selection={routingSelection}
+                    onChange={changeRoutingSelection}
+                    query={query}
+                    onQueryChange={setQuery}
+                    onShowGraph={showRouteInGraph}
+                    onSelect={selectResource}
+                    onBack={() => setView("graph")}
+                    active={view === "routes"}
+                    context={
+                      model.nodes.find(
+                        (node) => node.id === (chain || listener),
+                      )?.label
+                    }
+                  />
+                </div>
+                {view === "raw" ? (
                   <pre
                     className="raw-view"
                     aria-label={t("Full JSON configuration")}
                   >
                     <JsonCode value={model.raw} />
                   </pre>
-                ) : (
+                ) : view === "list" ? (
                   <div className="resource-list">
                     {resourceGroups.map(([kind, nodes]) => (
                       <details
@@ -1293,7 +1540,7 @@ function App() {
                       </p>
                     )}
                   </div>
-                )}
+                ) : null}
                 {!model.nodes.length && view === "graph" && (
                   <div className="empty">
                     {t(
@@ -1302,7 +1549,7 @@ function App() {
                   </div>
                 )}
               </div>
-              {selected && detailsOpen && (
+              {selected && detailsOpen && view !== "routes" && (
                 <ResizableInspector>
                   <div className="inspector-heading">
                     <span>{t("Configuration details")}</span>
@@ -1332,6 +1579,29 @@ function App() {
                       </a>
                       {reference.note && <small>{t(reference.note)}</small>}
                     </div>
+                  )}
+                  {routingIndex.entries.has(
+                    selected.routingKey ||
+                      routingIndex.byId.get(
+                        routingIndex.canonicalId.get(selected.id),
+                      )?.routingKey,
+                  ) && (
+                    <button
+                      className="routing-inspector-link"
+                      onClick={() =>
+                        browseRoutes(
+                          routingIndex.entries.get(
+                            selected.routingKey ||
+                              routingIndex.byId.get(
+                                routingIndex.canonicalId.get(selected.id),
+                              )?.routingKey,
+                          ),
+                        )
+                      }
+                    >
+                      {t("Browse routes")}
+                      <ArrowUpRight size={14} />
+                    </button>
                   )}
                   <div className="code-heading">
                     {t("Configuration")}

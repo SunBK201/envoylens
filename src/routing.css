@@ -1,0 +1,542 @@
+/* Both views stay mounted so switching does not discard their local context. */
+.routing-graph-view[hidden],
+.routing-workbench-view[hidden] {
+  display: none !important;
+}
+.routing-graph-view {
+  position: absolute;
+  inset: 0;
+}
+.routing-graph-controls {
+  position: absolute;
+  z-index: 8;
+  bottom: max(14px, env(safe-area-inset-bottom));
+  left: calc((100% + var(--nav-space) - 12px) / 2);
+  right: auto;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - var(--nav-space) - 244px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--glass-line);
+  border-radius: 12px;
+  background: var(--glass);
+  box-shadow: 0 4px 16px #00000008;
+  font-size: 12px;
+}
+.routing-config-picker,
+.routing-host-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.routing-graph-controls > label {
+  max-width: 100%;
+}
+.routing-config-picker > span,
+.routing-host-picker > span {
+  color: var(--palette-64748b);
+  font-size: 11px;
+}
+.routing-config-picker select,
+.routing-host-picker select {
+  min-width: 90px;
+  width: 170px;
+  max-width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 5px 30px 5px 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background-color: transparent;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23898983' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: inherit;
+  font: inherit;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.routing-config-picker select:hover,
+.routing-host-picker select:hover {
+  background-color: var(--palette-eaf0f3);
+  border-color: var(--glass-line);
+}
+.routing-config-picker select:focus,
+.routing-host-picker select:focus {
+  outline: none;
+  box-shadow: none;
+}
+.routing-config-picker select:focus-visible:not([data-pointer-selection]),
+.routing-host-picker select:focus-visible:not([data-pointer-selection]) {
+  outline: 2px solid #898983;
+  outline-offset: -2px;
+}
+.routing-graph-controls button,
+.route-workbench button,
+.routing-inspector-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.routing-graph-controls button:hover,
+.route-workbench button:hover {
+  background: var(--palette-f1f5f9);
+}
+.routing-keep {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.routing-keep input {
+  margin: 0;
+  accent-color: var(--palette-177b64);
+}
+.routing-primary {
+  color: var(--palette-177b64);
+  font-weight: 600;
+}
+.routing-workbench-view {
+  position: absolute;
+  top: 64px;
+  bottom: 60px;
+  left: var(--nav-space);
+  right: 12px;
+}
+.route-workbench {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px #00000009;
+  font-size: 12px;
+}
+.routing-workbench-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--glass-line);
+}
+.routing-context {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--palette-64748b);
+}
+.routing-workbench-header .routing-config-picker select {
+  width: 240px;
+}
+.routing-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--glass-line);
+  align-items: center;
+}
+.routing-summary > strong {
+  font-size: 16px;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.routing-summary > span {
+  color: var(--palette-64748b);
+}
+.routing-workbench-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.routing-host-list {
+  width: var(--routing-host-width, 240px);
+  min-width: 160px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--glass-line);
+}
+.routing-host-resize-handle {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  bottom: 0;
+  left: var(--routing-host-width, 240px);
+  width: 10px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+}
+.routing-host-resize-handle::after {
+  content: "";
+  position: absolute;
+  inset: 8px 4px;
+  border-radius: 3px;
+  background: transparent;
+}
+.routing-host-resize-handle:hover::after,
+.routing-host-resize-handle:focus-visible::after,
+.is-resizing-hosts .routing-host-resize-handle::after {
+  background: var(--palette-177b64);
+}
+.route-workbench.is-resizing-hosts,
+.route-workbench.is-resizing-hosts * {
+  cursor: col-resize;
+  user-select: none;
+}
+.routing-list-heading,
+.routing-rule-heading {
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--glass-line);
+}
+.routing-rule-heading > div {
+  min-width: 0;
+}
+.routing-rule-heading strong {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.routing-rule-heading small {
+  display: block;
+  margin-top: 4px;
+  color: var(--palette-64748b);
+}
+.routing-virtual-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+}
+.route-workbench .routing-host-row {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--glass-line);
+}
+.routing-host-row > span {
+  flex: 1;
+  min-width: 0;
+}
+.routing-host-row strong,
+.routing-host-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.routing-host-row small {
+  color: var(--palette-64748b);
+  margin-top: 5px;
+  font-size: 11px;
+}
+.routing-host-row b {
+  font-size: 11px;
+  border-radius: 5px;
+  padding: 3px 6px;
+  background: var(--palette-f1f5f9);
+}
+.route-workbench .is-selected {
+  background: color-mix(in srgb, var(--palette-177b64) 9%, transparent);
+  box-shadow: inset 3px 0 var(--palette-177b64);
+}
+.routing-rules {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.routing-table {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100px;
+}
+.routing-table-heading,
+.routing-rule-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1.1fr) minmax(0, 1fr) 70px;
+  align-items: center;
+}
+.routing-table-heading {
+  height: 32px;
+  flex-shrink: 0;
+  background: var(--palette-f8fafc);
+  color: var(--palette-64748b);
+  border-bottom: 1px solid var(--glass-line);
+}
+.routing-table-heading > span,
+.routing-rule-row > span {
+  min-width: 0;
+  padding: 0 10px;
+}
+.routing-rule-row {
+  height: 100%;
+  border-bottom: 1px solid var(--glass-line);
+}
+.routing-rule-row > span {
+  overflow: hidden;
+}
+.route-workbench .routing-rule-row button {
+  width: 100%;
+  height: 90px;
+  text-align: left;
+  padding: 4px 0;
+  line-height: 1.5;
+  overflow: hidden;
+}
+.routing-rule-row button > span {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.routing-rule-row em {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--palette-64748b);
+}
+.routing-rule-row > .routing-destinations {
+  max-height: 90px;
+  overflow-y: auto;
+}
+.route-workbench .routing-destinations button {
+  height: auto;
+  min-height: 30px;
+}
+.routing-rule-row button:hover > span,
+.routing-rule-row button:focus-visible > span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.routing-detail {
+  border-top: 1px solid var(--glass-line);
+  flex-shrink: 0;
+  max-height: 46%;
+  display: flex;
+  flex-direction: column;
+}
+.routing-detail-heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+}
+.routing-detail-heading > strong {
+  flex: 1;
+}
+.routing-detail-content {
+  overflow: auto;
+  padding: 0 14px 12px;
+}
+.routing-source-path {
+  font-size: 10px;
+  color: var(--palette-64748b);
+  overflow-wrap: anywhere;
+  margin-bottom: 10px;
+}
+.routing-footnote {
+  padding: 8px 14px;
+  border-top: 1px solid var(--glass-line);
+  color: var(--palette-64748b);
+  font-size: 11px;
+}
+.routing-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--palette-64748b);
+  padding: 24px;
+}
+.routing-search-results {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--glass-line);
+  max-height: 100px;
+  overflow: auto;
+}
+.routing-search-results > span {
+  align-self: center;
+  color: var(--palette-64748b);
+}
+@media (max-width: 1000px) {
+  .routing-graph-controls {
+    gap: 5px;
+  }
+  .routing-graph-controls select {
+    width: 130px;
+    min-width: 0;
+  }
+  .routing-workbench-header {
+    gap: 6px;
+  }
+  .routing-workbench-header .routing-context {
+    display: none;
+  }
+  .routing-workbench-header .routing-config-picker {
+    flex: 1;
+  }
+  .routing-workbench-header .routing-config-picker select {
+    width: 100%;
+  }
+}
+@media (max-width: 700px) {
+  .routing-host-resize-handle {
+    display: none;
+  }
+  .routing-workbench-view {
+    left: 12px;
+    z-index: 15;
+  }
+  .routing-workbench-body {
+    flex-direction: column;
+  }
+  .routing-host-list {
+    width: 100%;
+    height: 165px;
+    flex-shrink: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--glass-line);
+  }
+  .routing-list-heading {
+    height: 32px;
+  }
+  .routing-table-heading,
+  .routing-rule-row {
+    grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1fr) 55px;
+  }
+  .routing-detail-heading {
+    gap: 2px;
+    padding: 5px;
+  }
+  .routing-summary {
+    padding: 8px;
+    gap: 6px;
+  }
+  .routing-summary > strong {
+    font-size: 13px;
+  }
+  .routing-footnote {
+    display: none;
+  }
+}
+.floating-shell
+  .routing-graph-view:has(.routing-graph-controls)
+  .relationship-viewport {
+  padding-bottom: 140px;
+  scroll-padding-bottom: 148px;
+}
+.routing-graph-controls > span {
+  flex: 1;
+  min-width: 120px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.route-workbench .routing-rule-row button {
+  justify-content: flex-start;
+}
+.routing-host-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 8px 10px;
+  padding: 0 8px;
+  min-height: 34px;
+  border: 1px solid var(--glass-line);
+  border-radius: 7px;
+  background: var(--palette-white);
+  color: var(--palette-64748b);
+}
+.routing-host-search:focus-within {
+  border-color: var(--palette-177b64);
+}
+.routing-host-search input {
+  width: 100%;
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 7px 0;
+  background: transparent;
+  color: var(--palette-283749);
+  font: inherit;
+  outline: none;
+}
+/* Override global input focus rings; the wrapper owns the focus indicator. */
+.floating-shell .route-workbench .routing-host-search input,
+.floating-shell .route-workbench .routing-host-search input:focus,
+.floating-shell .route-workbench .routing-host-search input:focus-visible {
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  appearance: none;
+}
+.routing-host-search input::-webkit-search-cancel-button {
+  display: none;
+}
+.route-workbench .routing-host-search button {
+  padding: 3px;
+  flex-shrink: 0;
+}
+.routing-host-empty {
+  padding: 8px 14px;
+  color: var(--palette-64748b);
+  font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+  .routing-graph-controls {
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    max-width: calc(100% - var(--nav-space) - 24px);
+  }
+  .floating-shell
+    .routing-graph-view:has(.routing-graph-controls)
+    .relationship-viewport {
+    padding-bottom: 190px;
+    scroll-padding-bottom: 198px;
+  }
+}
