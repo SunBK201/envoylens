@@ -237,6 +237,29 @@ test("invalid, duplicate keys, aliases and unknown documents fail safely", () =>
   ])
     assert.throws(() => parseConfig(input));
 });
+
+test("JSON fast path rejects duplicate keys including escaped equivalent keys", () => {
+  for (const input of [
+    '{"node": {}, "node": {}}',
+    '{"node": {"id": 1, "id": 2}}',
+    '{"node": {"id": 1, "\\u0069d": 2}}',
+    '{"node": {"metadata": [{"a": 1, "a": 2}]}}',
+    '{"node": {"__proto__": 1, "__proto__": 2}}',
+  ])
+    assert.throws(() => parseConfig(input), /duplicate/i);
+});
+
+test("JSON token validation ignores punctuation in values and keys in sibling objects", () => {
+  const raw = {
+    node: {
+      id: '"{}[]: \\ text',
+      metadata: [{ same: 1 }, { same: 2 }],
+      'a":{}': "value",
+    },
+  };
+  assert.deepEqual(parse(raw).raw, raw);
+  assert.equal(parseConfig("{node: {id: flow-yaml}}").raw.node.id, "flow-yaml");
+});
 test("empty bootstrap is valid but has a diagnostic", () => {
   const m = parse({ static_resources: {} });
   assert.equal(m.nodes.length, 0);

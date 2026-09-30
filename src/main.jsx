@@ -237,8 +237,18 @@ function App() {
       localStorage.setItem("envoylens-nav-sort", sortDirection);
     } catch {}
   }, [sortDirection]);
+  const navigationResources = useMemo(
+    () =>
+      Object.fromEntries(
+        ["listener", "filter_chain", "cluster", "endpoint"].map((kind) => [
+          kind,
+          sortedResources(model.nodes, kind, sortDirection),
+        ]),
+      ),
+    [model, sortDirection],
+  );
   function orderedResources(kind) {
-    return sortedResources(model.nodes, kind, sortDirection);
+    return navGroups[kind] ? navigationResources[kind] : [];
   }
   function changeListener(id) {
     setCanvasRevision((value) => value + 1);
@@ -535,12 +545,14 @@ function App() {
       setError(e.message);
     }
   }
-  const counts = Object.fromEntries(
-    Object.keys(meta).map((k) => [
-      k,
-      model.nodes.filter((n) => n.kind === k).length,
-    ]),
-  );
+  const counts = useMemo(() => {
+    const result = Object.fromEntries(
+      Object.keys(meta).map((kind) => [kind, 0]),
+    );
+    for (const node of model.nodes)
+      result[node.kind] = (result[node.kind] || 0) + 1;
+    return result;
+  }, [model]);
   useEffect(() => {
     if (!modal) return;
     const dialog = document.querySelector("[role=dialog]");
@@ -585,10 +597,12 @@ function App() {
     return () => document.removeEventListener("keydown", handler);
   }, [detailsOpen, selected, modal]);
   const resourceGroups = useMemo(() => {
+    if (view !== "list") return [];
     const groups = new Map(Object.keys(meta).map((kind) => [kind, []]));
     const term = query.trim().toLowerCase();
     for (const node of model.nodes) {
       if (
+        term &&
         !(node.label + " " + JSON.stringify(node.detail))
           .toLowerCase()
           .includes(term)
@@ -598,7 +612,7 @@ function App() {
       groups.get(node.kind).push(node);
     }
     return [...groups].filter(([, nodes]) => nodes.length);
-  }, [model, query]);
+  }, [model, query, view]);
   const details = selected?.detail ?? model.raw;
   const reference = envoyReference(selected);
   useEffect(() => {

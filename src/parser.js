@@ -18,11 +18,41 @@ function configOrigin(path) {
   // Static route/endpoint dump entries can be inline in an xDS resource.
   return "unknown";
 }
+function readConfig(text) {
+  // Admin dumps are JSON. Avoid constructing a YAML syntax tree for every byte,
+  // while retaining YAML support (including flow mappings) and duplicate checks.
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    const doc = parseDocument(text, { uniqueKeys: true });
+    if (doc.errors.length)
+      throw new Error(`Invalid configuration: ${doc.errors[0].message}`);
+    return doc.toJS({ maxAliasCount: 100 });
+  }
+  // JSON.parse silently overwrites duplicate keys. Scan validated JSON tokens so
+  // the fast path keeps the strict YAML parser's unique-key contract.
+  const stack = [];
+  let string;
+  for (const match of text.matchAll(/"(?:[^"\\]|\\[\s\S])*"|[{}\[\]:]/g)) {
+    const token = match[0];
+    if (token === "{") stack.push(new Set());
+    else if (token === "[") stack.push(null);
+    else if (token === "}" || token === "]") stack.pop();
+    else if (token === ":") {
+      const key = string.includes("\\")
+        ? JSON.parse(string)
+        : string.slice(1, -1);
+      const keys = stack.at(-1);
+      if (keys.has(key))
+        throw new Error("Invalid configuration: duplicate mapping key");
+      keys.add(key);
+    } else string = token;
+  }
+  return raw;
+}
 export function parseConfig(text) {
-  const doc = parseDocument(text, { uniqueKeys: true });
-  if (doc.errors.length)
-    throw new Error(`Invalid configuration: ${doc.errors[0].message}`);
-  const raw = doc.toJS({ maxAliasCount: 100 });
+  const raw = readConfig(text);
   if (!raw || typeof raw !== "object" || Array.isArray(raw))
     throw new Error("Provide an Envoy bootstrap or config_dump object");
   try {

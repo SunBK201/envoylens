@@ -1,6 +1,65 @@
 import { connectionPath, edgeCaption } from "./edge-path.js";
 const overlaps = (a, b) =>
   a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+
+function lowerBound(items, value, key) {
+  let low = 0,
+    high = items.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (key(items[mid]) < value) low = mid + 1;
+    else high = mid;
+  }
+  return low;
+}
+
+// Cards occupy columns. Binary-search rows instead of scanning the entire graph
+// for every curve and every candidate detour segment. Build once per layout.
+export function createCardIndex(cards) {
+  const byX = new Map();
+  let maxWidth = 0;
+  for (const card of cards) {
+    if (!byX.has(card.x)) byX.set(card.x, { x: card.x, height: 0, cards: [] });
+    const column = byX.get(card.x);
+    column.cards.push(card);
+    column.height = Math.max(column.height, card.height);
+    maxWidth = Math.max(maxWidth, card.width);
+  }
+  const columns = [...byX.values()].sort((a, b) => a.x - b.x);
+  for (const column of columns) column.cards.sort((a, b) => a.y - b.y);
+  return {
+    lanes: [...new Set(cards.flatMap((r) => [r.y - 12, r.y + r.height + 12]))],
+    query({ left, right, top, bottom }) {
+      const result = [];
+      for (
+        let i = lowerBound(columns, left - maxWidth, (c) => c.x);
+        i < columns.length && columns[i].x <= right;
+        i++
+      ) {
+        const column = columns[i];
+        for (
+          let j = lowerBound(column.cards, top - column.height, (c) => c.y);
+          j < column.cards.length && column.cards[j].y <= bottom;
+          j++
+        ) {
+          const card = column.cards[j];
+          if (card.x + card.width >= left && card.y + card.height >= top)
+            result.push(card);
+        }
+      }
+      return result;
+    },
+  };
+}
+
+function pointBounds(points, padding = 0) {
+  return {
+    left: Math.min(...points.map((p) => p.x)) - padding,
+    right: Math.max(...points.map((p) => p.x)) + padding,
+    top: Math.min(...points.map((p) => p.y)) - padding,
+    bottom: Math.max(...points.map((p) => p.y)) + padding,
+  };
+}
 function curveHits(points, rect, depth = 0) {
   const xs = points.map((p) => p.x),
     ys = points.map((p) => p.y);
@@ -95,6 +154,7 @@ export function routeConnection({
   sourceId,
   targetId,
   cards,
+  cardIndex,
   gutter,
   sourceGutter = gutter,
 }) {
@@ -105,7 +165,9 @@ export function routeConnection({
       { x: center, y: ty },
       { x: tx, y: ty },
     ];
-  const obstacles = cards.filter((r) => r.id !== sourceId && r.id !== targetId);
+  const obstacles = (
+    cardIndex ? cardIndex.query(pointBounds(curve, 4.01)) : cards
+  ).filter((r) => r.id !== sourceId && r.id !== targetId);
   const blocked = obstacles.some((r) =>
     curveHits(curve, {
       left: r.x - 4,
@@ -116,18 +178,30 @@ export function routeConnection({
   );
   const caption = edgeCaption(sx, sy, tx, ty, gutter);
   if (!blocked)
-    return { ...connectionPath(sx, sy, tx, ty), caption, detour: false };
+    return {
+      ...connectionPath(sx, sy, tx, ty),
+      caption,
+      detour: false,
+      bounds: pointBounds(curve, 8),
+    };
   // Column gutters are clear vertical lanes. Choose the closest clear horizontal
   // band rather than sending every skipped-column edge around the whole graph.
   const exitX = sx + sourceGutter / 2,
     entryX = tx - gutter / 2;
-  const candidates = new Set([
-    sy,
-    ty,
-    ...cards.flatMap((r) => [r.y - 12, r.y + r.height + 12]),
-  ]);
-  let best = null,
-    bestCost = Infinity;
+  const candidates = [
+    ...new Set([
+      sy,
+      ty,
+      ...(cardIndex?.lanes ||
+        cards.flatMap((r) => [r.y - 12, r.y + r.height + 12])),
+    ]),
+  ];
+  const cost = (y) =>
+    Math.abs(y - sy) + Math.abs(y - ty) + Math.abs(y - (sy + ty) / 2) * 0.05;
+  // The first safe lane in stable cost order is the same minimum the exhaustive
+  // search would choose. Usually only one or two lanes need collision checks.
+  candidates.sort((a, b) => cost(a) - cost(b));
+  let best = null;
   for (const y of candidates) {
     const lane = [
       { x: exitX, y: sy },
@@ -137,16 +211,17 @@ export function routeConnection({
     ];
     if (
       lane.some(
-        (p, i) => i && cards.some((r) => segmentHitsCard(lane[i - 1], p, r, 8)),
+        (p, i) =>
+          i &&
+          (cardIndex
+            ? cardIndex.query(pointBounds([lane[i - 1], p], 8))
+            : cards
+          ).some((r) => segmentHitsCard(lane[i - 1], p, r, 8)),
       )
     )
       continue;
-    const cost =
-      Math.abs(y - sy) + Math.abs(y - ty) + Math.abs(y - (sy + ty) / 2) * 0.05;
-    if (cost < bestCost) {
-      bestCost = cost;
-      best = lane;
-    }
+    best = lane;
+    break;
   }
   if (!best)
     throw new Error("No safe edge path found; check for overlapping nodes");
@@ -156,5 +231,6 @@ export function routeConnection({
     caption: { ...caption, x: entryX, y: ty },
     detour: true,
     points,
+    bounds: pointBounds(points, 8),
   };
 }

@@ -9,8 +9,8 @@ import React, {
 import { ChevronDown, Scan } from "lucide-react";
 import NodePreview from "./NodePreview";
 import { layoutGraph, graphGeometry, displayTitle } from "./layout";
-import { routeConnection } from "./edge-routing";
-import { shouldShowEdgeLabel } from "./edge-path";
+import { graphConnections } from "./graph-connections";
+import { visibleGraph } from "./graph-viewport";
 import { nodeFields, summary, fieldLabels, originLabel } from "./node-fields";
 export { summary } from "./node-fields";
 const DEFAULT_ZOOM = 0.65;
@@ -280,71 +280,52 @@ export default function RelationshipGraph({
       top: Math.max(0, node.y * zoom - el.clientHeight / 3),
     });
   }, [focusTarget, graph]);
-  const connections = useMemo(() => {
-    const geometry = graph.geometry;
-    const outgoing = new Map(),
-      incoming = new Map();
-    for (const e of graph.edges) {
-      if (!outgoing.has(e.source)) outgoing.set(e.source, []);
-      if (!incoming.has(e.target)) incoming.set(e.target, []);
-      outgoing.get(e.source).push(e.id);
-      incoming.get(e.target).push(e.id);
-    }
-    const columnXs = [...new Set(graph.nodes.map((n) => n.x))].sort(
-      (a, b) => a - b,
-    );
-    const before = new Map(),
-      after = new Map();
-    for (let i = 1; i < columnXs.length; i++) {
-      const gap = columnXs[i] - columnXs[i - 1] - geometry.cardWidth;
-      before.set(columnXs[i], gap);
-      after.set(columnXs[i - 1], gap);
-    }
-    const captions = new Map();
-    return graph.edges.map((e) => {
-      const a = graph.byId.get(e.source),
-        b = graph.byId.get(e.target);
-      const sources = outgoing.get(e.source),
-        targets = incoming.get(e.target);
-      const sx = a.x + geometry.cardWidth,
-        sy =
-          a.y +
-          (geometry.cardHeight * (sources.indexOf(e.id) + 1)) /
-            (sources.length + 1);
-      const tx = b.x,
-        ty =
-          b.y +
-          (geometry.cardHeight * (targets.indexOf(e.id) + 1)) /
-            (targets.length + 1);
-      const p = routeConnection({
-        sx,
-        sy,
-        tx,
-        ty,
-        sourceId: e.source,
-        targetId: e.target,
-        cards: graph.nodes.map((n) => ({
-          id: n.id,
-          x: n.x,
-          y: n.y,
-          width: geometry.cardWidth,
-          height: geometry.cardHeight,
-        })),
-        gutter: before.get(b.x),
-        sourceGutter: after.get(a.x),
-      });
-      const caption = p.caption;
-      const showLabel = shouldShowEdgeLabel(e.label);
-      const occupied = captions.get(caption.x) || [];
-      let top = Math.max(52, caption.y - 16);
-      while (occupied.some((y) => Math.abs(y - top) < 36)) top += 36;
-      if (showLabel) {
-        occupied.push(top);
-        captions.set(caption.x, occupied);
-      }
-      return { ...e, showLabel, path: p.path, caption: { ...caption, top } };
-    });
-  }, [graph]);
+  const connections = useMemo(() => graphConnections(graph), [graph]);
+  const [visibleBounds, setVisibleBounds] = useState({
+    left: 0,
+    top: 0,
+    right: 2000,
+    bottom: 1400,
+  });
+  useLayoutEffect(() => {
+    const el = viewport.current;
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      if (!el || !surface.current) return;
+      const rect = el.getBoundingClientRect();
+      const origin = surface.current.getBoundingClientRect();
+      // Overscan one card in screen space to keep panning smooth.
+      const padding = 320;
+      const next = {
+        left: (rect.left - origin.left - padding) / zoom,
+        top: (rect.top - origin.top - padding) / zoom,
+        right: (rect.right - origin.left + padding) / zoom,
+        bottom: (rect.bottom - origin.top + padding) / zoom,
+      };
+      setVisibleBounds((current) =>
+        Object.keys(next).every((key) => current[key] === next[key])
+          ? current
+          : next,
+      );
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    measure();
+    const observer = new ResizeObserver(schedule);
+    observer.observe(el);
+    el.addEventListener("scroll", schedule, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      el.removeEventListener("scroll", schedule);
+    };
+  }, [graph, zoom]);
+  const visible = useMemo(
+    () => visibleGraph(graph, connections, visibleBounds),
+    [graph, connections, visibleBounds],
+  );
   const columns = useMemo(() => {
     const map = new Map();
     for (const n of graph.nodes) {
@@ -396,11 +377,12 @@ export default function RelationshipGraph({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [hits, zoom]);
-  const chains = model.nodes.filter(
-    (n) =>
-      n.kind === "filter_chain" &&
-      (!listener || reach(listener, model.edges).has(n.id)),
-  );
+  const chains = useMemo(() => {
+    const reachable = listener ? reach(listener, model.edges) : null;
+    return model.nodes.filter(
+      (n) => n.kind === "filter_chain" && (!reachable || reachable.has(n.id)),
+    );
+  }, [model, listener]);
   return (
     <div className="relationship-graph">
       {preview && (
@@ -549,7 +531,7 @@ export default function RelationshipGraph({
                   <path d="M 0 0 L 10 5 L 0 10 z" fill="#969a91" />
                 </marker>
               </defs>
-              {connections.map((e) => {
+              {visible.connections.map((e) => {
                 const dim =
                   highlighted &&
                   !(highlighted.has(e.source) && highlighted.has(e.target));
@@ -570,7 +552,7 @@ export default function RelationshipGraph({
                 );
               })}
             </svg>
-            {connections
+            {visible.connections
               .filter((e) => e.showLabel)
               .map((e) => (
                 <div
@@ -591,7 +573,7 @@ export default function RelationshipGraph({
                   {e.label}
                 </div>
               ))}
-            {graph.nodes.map((n) => (
+            {visible.nodes.map((n) => (
               <button
                 key={n.id}
                 className={`relationship-node ${selected?.id === n.id ? "selected" : ""} ${highlighted && !highlighted.has(n.id) ? "dimmed" : ""} ${hitIds.has(n.id) ? "hit" : ""} ${n.state === "unresolved" ? "missing" : ""}`}
