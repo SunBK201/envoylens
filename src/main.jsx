@@ -30,8 +30,6 @@ import {
   X,
   RefreshCw,
   Download,
-  Copy,
-  Check,
   GitBranch,
   List,
   PanelLeftClose,
@@ -1603,28 +1601,22 @@ function App() {
                       <ArrowUpRight size={14} />
                     </button>
                   )}
-                  <div className="code-heading">
-                    {t("Configuration")}
-                    <button
-                      title={t("Copy configuration")}
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(
-                            JSON.stringify(details, null, 2),
-                          );
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1500);
-                        } catch {
-                          setError(
-                            "Clipboard unavailable. Copy the configuration manually.",
-                          );
-                        }
-                      }}
-                    >
-                      {copied ? <Check size={14} /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                  <ConfigViewer key={selected.id} value={details} />
+                  <ConfigViewer
+                    key={selected.id}
+                    value={details}
+                    copied={copied}
+                    onCopy={async (text) => {
+                      try {
+                        await navigator.clipboard.writeText(text);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      } catch {
+                        setError(
+                          "Clipboard unavailable. Copy the configuration manually.",
+                        );
+                      }
+                    }}
+                  />
                   <div className="related">
                     <strong>{t("Related resources")}</strong>
                     {model.edges

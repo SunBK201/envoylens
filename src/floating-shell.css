@@ -1304,30 +1304,30 @@ pre:has(> .json-code),
   color: var(--editor-gutter);
   vertical-align: baseline;
 }
-.json-code .json-key {
+:is(.json-code, .yaml-code) .json-key {
   color: #795e26;
 }
-.json-code .json-string {
+:is(.json-code, .yaml-code) .json-string {
   color: #42713d;
 }
-.json-code .json-number {
+:is(.json-code, .yaml-code) .json-number {
   color: #92621d;
 }
-.json-code .json-boolean,
-.json-code .json-null {
+:is(.json-code, .yaml-code) .json-boolean,
+:is(.json-code, .yaml-code) .json-null {
   color: #88528b;
 }
-:root[data-theme="dark"] .json-code .json-key {
+:root[data-theme="dark"] :is(.json-code, .yaml-code) .json-key {
   color: #d9c69c;
 }
-:root[data-theme="dark"] .json-code .json-string {
+:root[data-theme="dark"] :is(.json-code, .yaml-code) .json-string {
   color: #ce9178;
 }
-:root[data-theme="dark"] .json-code .json-number {
+:root[data-theme="dark"] :is(.json-code, .yaml-code) .json-number {
   color: #b5cea8;
 }
-:root[data-theme="dark"] .json-code .json-boolean,
-:root[data-theme="dark"] .json-code .json-null {
+:root[data-theme="dark"] :is(.json-code, .yaml-code) .json-boolean,
+:root[data-theme="dark"] :is(.json-code, .yaml-code) .json-null {
   color: #c8a2c8;
 }
 

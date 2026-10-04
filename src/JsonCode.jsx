@@ -1,12 +1,12 @@
 import { t } from "./i18n";
-import React, { useMemo, useState, useRef, useLayoutEffect } from "react";
+import React, { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { CodeLine, useCodeWindow } from "./CodeSurface";
 import { jsonTokens } from "./json-tokens";
 import {
   jsonLineTree,
   jsonVisibleRows,
   jsonRowText,
-  jsonRowWindow,
   JSON_ROW_HEIGHT,
 } from "./json-lines";
 const EMPTY_COLLAPSED = new Set();
@@ -21,26 +21,6 @@ function JsonValue({ value }) {
         {token.text}
       </span>
     ),
-  );
-}
-
-function CodeLine({ number, depth, toggle, children }) {
-  return (
-    <span className="json-code-line">
-      <span className="json-gutter" contentEditable={false}>
-        <span
-          className="json-line-number"
-          aria-hidden="true"
-          data-line={number}
-        />
-        <span className="json-fold-slot">{toggle}</span>
-      </span>
-      <span className="json-line-content">
-        <span className="json-indent">{"  ".repeat(depth)}</span>
-        {children}
-        {"\n"}
-      </span>
-    </span>
   );
 }
 
@@ -145,41 +125,7 @@ export default function JsonCode({ value }) {
       ),
     [rows, collapsed],
   );
-  const code = useRef(null);
-  const [window, setWindow] = useState({ start: 0, end: 80 });
-  useLayoutEffect(() => {
-    const scroller = code.current.parentElement;
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const top = Math.max(
-        0,
-        scroller.getBoundingClientRect().top +
-          scroller.clientTop -
-          code.current.getBoundingClientRect().top,
-      );
-      const next = jsonRowWindow(rows.length, top, scroller.clientHeight);
-      setWindow((current) =>
-        current.start === next.start && current.end === next.end
-          ? current
-          : next,
-      );
-    };
-    const schedule = () => {
-      if (!frame) frame = requestAnimationFrame(measure);
-    };
-    measure();
-    const observer = new ResizeObserver(schedule);
-    observer.observe(scroller);
-    scroller.addEventListener("scroll", schedule, { passive: true });
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      scroller.removeEventListener("scroll", schedule);
-    };
-  }, [rows]);
-  const start = Math.min(window.start, Math.max(0, rows.length - 1));
-  const end = Math.min(rows.length, Math.max(start + 1, window.end));
+  const { code, start, end } = useCodeWindow(rows);
   function toggle(line) {
     setFolding((current) => {
       const next = new Set(current.branch === branch ? current.collapsed : []);

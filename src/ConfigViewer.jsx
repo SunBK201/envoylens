@@ -1,5 +1,5 @@
 import { t } from "./i18n";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -20,8 +20,12 @@ import {
   Tag,
   Plug,
   Search,
+  Copy,
+  Check,
 } from "lucide-react";
 import JsonCode from "./JsonCode";
+import YamlCode from "./YamlCode";
+import { formatConfiguration } from "./config-format";
 import { semanticField } from "./envoy-semantics";
 
 const semanticIcons = [
@@ -139,16 +143,19 @@ function ConfigRow({ name, value, depth = 0, parent = "", index }) {
   );
 }
 
-export default function ConfigViewer({ value }) {
+export default function ConfigViewer({ value, onCopy, copied = false }) {
   const [mode, setMode] = useState(() => {
     try {
-      return localStorage.getItem("envoylens-config-view") === "tree"
-        ? "tree"
-        : "json";
+      const saved = localStorage.getItem("envoylens-config-view");
+      return ["tree", "json", "yaml"].includes(saved) ? saved : "json";
     } catch {
       return "json";
     }
   });
+  const yaml = useMemo(
+    () => (mode === "yaml" ? formatConfiguration(value, "yaml") : ""),
+    [value, mode],
+  );
   function selectMode(next) {
     setMode(next);
     try {
@@ -161,6 +168,20 @@ export default function ConfigViewer({ value }) {
     value !== null && typeof value === "object" ? Object.entries(value) : null;
   return (
     <div className="config-viewer">
+      {onCopy && (
+        <div className="code-heading">
+          {t("Configuration")}
+          <button
+            title={t("Copy configuration")}
+            aria-label={t("Copy configuration")}
+            onClick={() =>
+              onCopy(mode === "yaml" ? yaml : formatConfiguration(value))
+            }
+          >
+            {copied ? <Check size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
+      )}
       <div
         className="config-view-switch"
         role="group"
@@ -176,7 +197,13 @@ export default function ConfigViewer({ value }) {
           aria-pressed={mode === "json"}
           onClick={() => selectMode("json")}
         >
-          {t("Raw JSON")}
+          {t("JSON view")}
+        </button>
+        <button
+          aria-pressed={mode === "yaml"}
+          onClick={() => selectMode("yaml")}
+        >
+          {t("YAML view")}
         </button>
       </div>
       {mode === "tree" ? (
@@ -207,6 +234,10 @@ export default function ConfigViewer({ value }) {
             </tbody>
           </table>
         </div>
+      ) : mode === "yaml" ? (
+        <pre className="config-json" aria-label={t("YAML configuration")}>
+          <YamlCode text={yaml} />
+        </pre>
       ) : (
         <pre className="config-json" aria-label={t("Raw JSON configuration")}>
           <JsonCode value={value} />
