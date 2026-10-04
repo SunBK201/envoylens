@@ -1,3 +1,4 @@
+import { schemaTypes } from "./schema-docs";
 import React, {
   useEffect,
   useLayoutEffect,
@@ -616,6 +617,7 @@ export default function RouteWorkbench({
                           <ConfigViewer
                             key={route.key}
                             value={route.node.detail}
+                            schemaType={schemaTypes.route}
                           />
                         </div>
                       )}

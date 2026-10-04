@@ -1,0 +1,45 @@
+[data-schema-path] {
+  cursor: help;
+}
+[data-schema-path]:hover,
+[data-schema-path]:focus-visible {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.schema-documentation {
+  position: fixed;
+  z-index: 1000;
+  box-sizing: border-box;
+  max-height: min(300px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--palette-dce4e9);
+  border-radius: 10px;
+  background: var(--palette-fdfefe);
+  backdrop-filter: blur(24px);
+  color: var(--palette-283749);
+  box-shadow: 0 8px 32px #0003;
+  font:
+    12px/1.6 system-ui,
+    sans-serif;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.schema-documentation strong,
+.schema-documentation small {
+  display: block;
+}
+.schema-documentation small {
+  opacity: 0.7;
+}
+.schema-documentation-text {
+  margin-top: 8px;
+  white-space: pre-wrap;
+}
+.schema-documentation a {
+  color: var(--palette-177b64);
+  text-decoration: underline;
+}
+.schema-documentation code {
+  font-size: 11px;
+}

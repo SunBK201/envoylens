@@ -1,3 +1,4 @@
+import { schemaTypes } from "./schema-docs";
 import {
   t,
   nodeLabel,
@@ -1793,6 +1794,7 @@ function App() {
                   <ConfigViewer
                     key={selected.id}
                     value={details}
+                    schemaType={schemaTypes[selected.kind]}
                     copied={copied}
                     onCopy={async (text) => {
                       try {

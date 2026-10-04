@@ -1,16 +1,35 @@
-import { LineCounter, parseDocument, visit } from "yaml";
+import { LineCounter, parseDocument, visit, isMap, isSeq } from "yaml";
 import { yamlTokens } from "./yaml-tokens.js";
 
 export function yamlLineRows(text) {
   const lineCounter = new LineCounter();
   const document = parseDocument(text, { lineCounter });
+  const keyPaths = new Map();
+  function collect(node, path = []) {
+    if (isMap(node)) {
+      for (const pair of node.items) {
+        if (!pair.key?.range) continue;
+        const childPath = [...path, String(pair.key.value)];
+        keyPaths.set(pair.key.range[0], childPath);
+        collect(pair.value, childPath);
+      }
+    } else if (isSeq(node)) {
+      node.items.forEach((item, index) => collect(item, [...path, index]));
+    }
+  }
+  if (!document.errors.length) collect(document.contents);
   const rows = [{ number: 1, text: "", tokens: [] }];
-  for (const token of yamlTokens(text, document)) {
+  for (const token of yamlTokens(text, document, keyPaths)) {
     token.text.split("\n").forEach((part, index) => {
       if (index) rows.push({ number: rows.length + 1, text: "", tokens: [] });
       const row = rows.at(-1);
       row.text += part;
-      if (part) row.tokens.push({ text: part, type: token.type });
+      if (part)
+        row.tokens.push({
+          text: part,
+          type: token.type,
+          ...(token.path ? { path: token.path } : {}),
+        });
     });
   }
   if (text.endsWith("\n")) rows.pop();

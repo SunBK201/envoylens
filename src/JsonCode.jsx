@@ -9,6 +9,7 @@ import {
   jsonRowText,
   JSON_ROW_HEIGHT,
 } from "./json-lines";
+import SchemaDocumentation from "./SchemaDocumentation";
 const EMPTY_COLLAPSED = new Set();
 
 function JsonValue({ value }) {
@@ -67,7 +68,13 @@ function JsonRow({ branch, closing, open, onToggle }) {
     >
       {name !== undefined && (
         <>
-          <span className="json-key">{JSON.stringify(name)}</span>
+          <span
+            className="json-key"
+            data-schema-path={JSON.stringify(branch.path)}
+            tabIndex={0}
+          >
+            {JSON.stringify(name)}
+          </span>
           {": "}
         </>
       )}
@@ -101,7 +108,7 @@ function JsonRow({ branch, closing, open, onToggle }) {
   );
 }
 
-export default function JsonCode({ value }) {
+export default function JsonCode({ value, schemaType }) {
   const branch = useMemo(() => jsonLineTree(value), [value]);
   const [folding, setFolding] = useState({
     branch: null,
@@ -135,25 +142,27 @@ export default function JsonCode({ value }) {
     });
   }
   return (
-    <code
-      ref={code}
-      className="json-code"
-      style={{
-        "--json-line-digits": String(branch.endLine).length,
-        minWidth: `max(100%, calc(${maxColumns + String(branch.endLine).length + 4}ch + 36px))`,
-        paddingTop: start * JSON_ROW_HEIGHT,
-        paddingBottom: (rows.length - end) * JSON_ROW_HEIGHT,
-      }}
-    >
-      {rows.slice(start, end).map(({ branch: row, closing }) => (
-        <JsonRow
-          key={`${row.startLine}-${closing}`}
-          branch={row}
-          closing={closing}
-          open={!collapsed.has(row.startLine)}
-          onToggle={() => toggle(row.startLine)}
-        />
-      ))}
-    </code>
+    <SchemaDocumentation value={value} schemaType={schemaType}>
+      <code
+        ref={code}
+        className="json-code"
+        style={{
+          "--json-line-digits": String(branch.endLine).length,
+          minWidth: `max(100%, calc(${maxColumns + String(branch.endLine).length + 4}ch + 36px))`,
+          paddingTop: start * JSON_ROW_HEIGHT,
+          paddingBottom: (rows.length - end) * JSON_ROW_HEIGHT,
+        }}
+      >
+        {rows.slice(start, end).map(({ branch: row, closing }) => (
+          <JsonRow
+            key={`${row.startLine}-${closing}`}
+            branch={row}
+            closing={closing}
+            open={!collapsed.has(row.startLine)}
+            onToggle={() => toggle(row.startLine)}
+          />
+        ))}
+      </code>
+    </SchemaDocumentation>
   );
 }

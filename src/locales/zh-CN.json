@@ -306,5 +306,8 @@
   "Drag to resize width; use left/right arrow keys; double-click to reset": "拖动调整宽度；左右方向键微调；双击恢复默认",
   "Resize configuration details height": "调整配置详情高度",
   "Drag to resize height; use up/down arrow keys; double-click to reset": "拖动调整高度；上下方向键微调；双击恢复默认",
-  "Resize resource navigation height": "调整资源导航高度"
+  "Resize resource navigation height": "调整资源导航高度",
+  "Default": "默认值",
+  "Unable to load field documentation. Hover again to retry.": "字段文档加载失败，请重新悬停重试。",
+  "No schema documentation for this field.": "Schema 中未找到此字段的文档。"
 }

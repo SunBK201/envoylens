@@ -1,7 +1,7 @@
 // Keep original JSON line numbers stable when branches are folded.
 export function jsonLineTree(value) {
   let line = 0;
-  function visit(value, name, depth, comma, label) {
+  function visit(value, name, depth, comma, label, path = []) {
     const startLine = ++line;
     const entries =
       value !== null && typeof value === "object" ? Object.entries(value) : [];
@@ -13,11 +13,13 @@ export function jsonLineTree(value) {
         depth + 1,
         index < entries.length - 1,
         array ? `${label}[${key}]` : key,
+        [...path, array ? Number(key) : key],
       ),
     );
     const endLine = children.length ? ++line : startLine;
     return {
       value,
+      path,
       name,
       depth,
       comma,

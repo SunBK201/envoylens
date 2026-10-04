@@ -301,5 +301,8 @@
   "Drag to resize width; use left/right arrow keys; double-click to reset": "Drag to resize width; use left/right arrow keys; double-click to reset",
   "Resize configuration details height": "Resize configuration details height",
   "Drag to resize height; use up/down arrow keys; double-click to reset": "Drag to resize height; use up/down arrow keys; double-click to reset",
-  "Resize resource navigation height": "Resize resource navigation height"
+  "Resize resource navigation height": "Resize resource navigation height",
+  "Default": "Default",
+  "Unable to load field documentation. Hover again to retry.": "Unable to load field documentation. Hover again to retry.",
+  "No schema documentation for this field.": "No schema documentation for this field."
 }

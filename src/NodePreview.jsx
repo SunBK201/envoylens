@@ -1,3 +1,4 @@
+import { schemaTypes } from "./schema-docs";
 import { t, nodeLabel } from "./i18n";
 import React, { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
@@ -55,7 +56,7 @@ export default function NodePreview({
         </div>
       )}
       <pre>
-        <JsonCode value={node.detail} />
+        <JsonCode value={node.detail} schemaType={schemaTypes[node.kind]} />
       </pre>
     </aside>,
     document.body,

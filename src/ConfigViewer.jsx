@@ -143,7 +143,12 @@ function ConfigRow({ name, value, depth = 0, parent = "", index }) {
   );
 }
 
-export default function ConfigViewer({ value, onCopy, copied = false }) {
+export default function ConfigViewer({
+  value,
+  schemaType,
+  onCopy,
+  copied = false,
+}) {
   const [mode, setMode] = useState(() => {
     try {
       const saved = localStorage.getItem("envoylens-config-view");
@@ -236,11 +241,11 @@ export default function ConfigViewer({ value, onCopy, copied = false }) {
         </div>
       ) : mode === "yaml" ? (
         <pre className="config-json" aria-label={t("YAML configuration")}>
-          <YamlCode text={yaml} />
+          <YamlCode text={yaml} value={value} schemaType={schemaType} />
         </pre>
       ) : (
         <pre className="config-json" aria-label={t("Raw JSON configuration")}>
-          <JsonCode value={value} />
+          <JsonCode value={value} schemaType={schemaType} />
         </pre>
       )}
     </div>
