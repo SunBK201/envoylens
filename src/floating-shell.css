@@ -1386,8 +1386,8 @@ html[lang="en"] .floating-shell .explorer-header .view-tabs button {
 }
 .floating-shell .appearance-controls button {
   min-width: 36px;
-  height: 36px;
-  padding: 6px 8px;
+  height: 28px;
+  padding: 2px 8px;
   font-size: 13px;
 }
 .floating-shell .canvas-layout > .inspector {
