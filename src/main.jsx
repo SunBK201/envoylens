@@ -1750,7 +1750,7 @@ function App() {
                 aria-label={t("Change language")}
                 onClick={() => setLanguage(language === "zh" ? "en" : "zh")}
               >
-                {language === "zh" ? "EN" : t("Chinese")}
+                {language === "zh" ? "EN" : "ZH"}
               </button>
               <button
                 className="theme-toggle"
