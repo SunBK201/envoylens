@@ -1641,7 +1641,12 @@ function App() {
               {selected && detailsOpen && view !== "routes" && (
                 <ResizableInspector>
                   <div className="inspector-heading">
-                    <span>{t("Configuration details")}</span>
+                    <span
+                      className="detail-kind"
+                      style={{ color: meta[selected.kind]?.[1] }}
+                    >
+                      {meta[selected.kind]?.[0]}
+                    </span>
                     <button
                       onClick={() => setDetailsOpen(false)}
                       aria-label={t("Close details")}
@@ -1649,12 +1654,6 @@ function App() {
                       <X size={17} />
                     </button>
                   </div>
-                  <span
-                    className="detail-kind"
-                    style={{ color: meta[selected.kind]?.[1] }}
-                  >
-                    {meta[selected.kind]?.[0]}
-                  </span>
                   <h2>{nodeLabel(selected)}</h2>
                   {reference && (
                     <div className="envoy-reference">

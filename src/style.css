@@ -632,7 +632,7 @@ footer > small {
   align-items: center;
   font-size: 13px;
   color: #969696;
-  margin-bottom: 22px;
+  margin-bottom: 0;
 }
 .detail-kind {
   font-size: 13px;
