@@ -430,35 +430,19 @@ main {
 .floating-shell .nav-resize-handle {
   position: absolute;
   z-index: 14;
-  left: calc(var(--nav-width, 180px) + 7px);
-  top: 72px;
-  bottom: 70px;
-  width: 10px;
-  cursor: col-resize;
+  width: 8px;
+  cursor: ew-resize;
   touch-action: none;
-  border-radius: 6px;
-}
-.floating-shell .nav-resize-handle::after {
-  content: "";
-  position: absolute;
-  inset: 8px 4px;
-  border-radius: 3px;
+  user-select: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
-}
-.floating-shell .nav-resize-handle:hover::after,
-.floating-shell .nav-resize-handle:focus-visible::after,
-.floating-shell.resizing-nav .nav-resize-handle::after {
-  background: #999999;
 }
 .floating-shell.resizing-nav,
 .floating-shell.resizing-nav * {
-  cursor: col-resize;
+  cursor: ew-resize;
   user-select: none;
-}
-@media (max-width: 700px) {
-  .floating-shell .nav-resize-handle {
-    bottom: 122px;
-  }
 }
 .floating-shell .canvas-layout > .inspector {
   width: min(500px, calc(100% - 24px));
@@ -626,6 +610,46 @@ main {
 }
 .inspector-resize:hover {
   background: transparent;
+}
+.inspector-resize-width {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 28px;
+  width: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  background: transparent;
+}
+.inspector-resize-height {
+  position: absolute;
+  left: 28px;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  background: transparent;
+}
+.floating-shell .nav-resize-handle:hover,
+.floating-shell .nav-resize-handle:focus-visible,
+.floating-shell .nav-height-resize-handle:hover,
+.floating-shell .nav-height-resize-handle:focus-visible,
+.inspector-resize-height:hover,
+.inspector-resize-height:focus-visible,
+.inspector-resize-width:hover,
+.inspector-resize-width:focus-visible {
+  background: var(--glass-line);
 }
 
 .nav-group > summary {
@@ -833,7 +857,7 @@ main {
   left: 12px;
   top: 64px;
   width: var(--nav-width, 180px);
-  max-height: calc(100dvh - 128px);
+  max-height: calc(100dvh - 64px);
 }
 .floating-shell .nav-dock > .resource-nav {
   position: relative;
@@ -848,8 +872,8 @@ main {
 }
 .floating-shell .nav-dock > .nav-resize-handle {
   left: auto;
-  right: -5px;
-  top: 8px;
+  right: 0;
+  top: 0;
   bottom: 8px;
 }
 
@@ -1392,4 +1416,25 @@ html[lang="en"] .floating-shell .explorer-header .view-tabs button {
 }
 .floating-shell .canvas-layout > .inspector {
   bottom: calc(66px + env(safe-area-inset-bottom));
+}
+
+.floating-shell .nav-height-resize-handle {
+  position: absolute;
+  z-index: 14;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.floating-shell.resizing-nav-height,
+.floating-shell.resizing-nav-height * {
+  cursor: ns-resize;
+  user-select: none;
 }

@@ -301,5 +301,10 @@
   "Save": "保存",
   "Enter an absolute HTTP or HTTPS documentation URL.": "请输入完整的 HTTP 或 HTTPS 文档地址。",
   "Use an HTTP or HTTPS URL without credentials, query parameters, or fragments.": "请使用不含用户名、密码、查询参数或片段的 HTTP 或 HTTPS 地址。",
-  "Unable to save the documentation URL. Browser storage may be disabled.": "无法保存文档地址，浏览器存储可能已禁用。"
+  "Unable to save the documentation URL. Browser storage may be disabled.": "无法保存文档地址，浏览器存储可能已禁用。",
+  "Resize configuration details width": "调整配置详情宽度",
+  "Drag to resize width; use left/right arrow keys; double-click to reset": "拖动调整宽度；左右方向键微调；双击恢复默认",
+  "Resize configuration details height": "调整配置详情高度",
+  "Drag to resize height; use up/down arrow keys; double-click to reset": "拖动调整高度；上下方向键微调；双击恢复默认",
+  "Resize resource navigation height": "调整资源导航高度"
 }

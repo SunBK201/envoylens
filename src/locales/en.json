@@ -296,5 +296,10 @@
   "Save": "Save",
   "Enter an absolute HTTP or HTTPS documentation URL.": "Enter an absolute HTTP or HTTPS documentation URL.",
   "Use an HTTP or HTTPS URL without credentials, query parameters, or fragments.": "Use an HTTP or HTTPS URL without credentials, query parameters, or fragments.",
-  "Unable to save the documentation URL. Browser storage may be disabled.": "Unable to save the documentation URL. Browser storage may be disabled."
+  "Unable to save the documentation URL. Browser storage may be disabled.": "Unable to save the documentation URL. Browser storage may be disabled.",
+  "Resize configuration details width": "Resize configuration details width",
+  "Drag to resize width; use left/right arrow keys; double-click to reset": "Drag to resize width; use left/right arrow keys; double-click to reset",
+  "Resize configuration details height": "Resize configuration details height",
+  "Drag to resize height; use up/down arrow keys; double-click to reset": "Drag to resize height; use up/down arrow keys; double-click to reset",
+  "Resize resource navigation height": "Resize resource navigation height"
 }

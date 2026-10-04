@@ -240,13 +240,41 @@ function App() {
       return 180;
     }
   });
+  const [navHeight, setNavHeight] = useState(() => {
+    try {
+      const saved = Number(window.localStorage.getItem("envoylens-nav-height"));
+      return Number.isFinite(saved) && saved >= 160 ? saved : null;
+    } catch {
+      return null;
+    }
+  });
+  const navHeightDrag = useRef(null);
+  const [resizingNavHeight, setResizingNavHeight] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(window.innerHeight);
+  // The dock starts 64px below the viewport top; allow resizing to the bottom.
+  const navHeightMax = Math.max(160, windowHeight - 64);
+  const displayedNavHeight =
+    navHeight === null ? undefined : Math.min(navHeight, navHeightMax);
+  const resizeNavHeight = (height) =>
+    setNavHeight(Math.max(160, Math.min(navHeightMax, height)));
+  useEffect(() => {
+    try {
+      if (navHeight === null)
+        window.localStorage.removeItem("envoylens-nav-height");
+      else
+        window.localStorage.setItem("envoylens-nav-height", String(navHeight));
+    } catch {}
+  }, [navHeight]);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const navMax = Math.max(160, Math.min(520, windowWidth - 180));
   const displayedNavWidth = Math.min(navWidth, navMax);
   const navDrag = useRef(null);
   const [resizingNav, setResizingNav] = useState(false);
   useEffect(() => {
-    const resize = () => setWindowWidth(window.innerWidth);
+    const resize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
@@ -983,7 +1011,7 @@ function App() {
       <div className="workspace">
         <main>
           <section
-            className={`explorer floating-shell ${side ? "nav-open" : "nav-closed"} ${resizingNav ? "resizing-nav" : ""}`}
+            className={`explorer floating-shell ${side ? "nav-open" : "nav-closed"} ${resizingNav ? "resizing-nav" : ""} ${resizingNavHeight ? "resizing-nav-height" : ""}`}
             style={{ "--nav-width": `${displayedNavWidth}px` }}
           >
             <div className="explorer-header">
@@ -1181,9 +1209,17 @@ function App() {
             )}
             <div className="canvas-layout">
               {side && (
-                <div className="nav-dock">
+                <div
+                  className="nav-dock"
+                  style={{ height: displayedNavHeight }}
+                >
                   <aside
                     className="resource-nav"
+                    style={
+                      displayedNavHeight === undefined
+                        ? undefined
+                        : { height: "100%" }
+                    }
                     aria-label={t("Resource navigation")}
                   >
                     <div className="nav-title">
@@ -1434,6 +1470,69 @@ function App() {
                       </>
                     )}
                   </aside>
+                  <div
+                    className="nav-height-resize-handle"
+                    role="separator"
+                    aria-label={t("Resize resource navigation height")}
+                    aria-orientation="horizontal"
+                    aria-valuemin={160}
+                    aria-valuemax={navHeightMax}
+                    aria-valuenow={displayedNavHeight}
+                    tabIndex={0}
+                    title={t(
+                      "Drag to resize height; use up/down arrow keys; double-click to reset",
+                    )}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.preventDefault();
+                      navHeightDrag.current = {
+                        id: e.pointerId,
+                        y: e.clientY,
+                        height:
+                          e.currentTarget.parentElement.getBoundingClientRect()
+                            .height,
+                      };
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setResizingNavHeight(true);
+                    }}
+                    onPointerMove={(e) => {
+                      const start = navHeightDrag.current;
+                      if (start?.id === e.pointerId)
+                        resizeNavHeight(start.height + e.clientY - start.y);
+                    }}
+                    onPointerUp={(e) => {
+                      navHeightDrag.current = null;
+                      setResizingNavHeight(false);
+                      if (e.currentTarget.hasPointerCapture(e.pointerId))
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                    }}
+                    onPointerCancel={() => {
+                      navHeightDrag.current = null;
+                      setResizingNavHeight(false);
+                    }}
+                    onLostPointerCapture={() => {
+                      navHeightDrag.current = null;
+                      setResizingNavHeight(false);
+                    }}
+                    onDoubleClick={() => setNavHeight(null)}
+                    onKeyDown={(e) => {
+                      if (
+                        !["ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)
+                      )
+                        return;
+                      e.preventDefault();
+                      const height =
+                        e.currentTarget.parentElement.getBoundingClientRect()
+                          .height;
+                      if (e.key === "Home") setNavHeight(null);
+                      else
+                        resizeNavHeight(
+                          e.key === "End"
+                            ? navHeightMax
+                            : height + (e.key === "ArrowDown" ? 10 : -10),
+                        );
+                    }}
+                  />
                   <div
                     className="nav-resize-handle"
                     role="separator"

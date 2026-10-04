@@ -52,62 +52,80 @@ export default function ResizableInspector({ children }) {
       }
     >
       <div className="inspector-content">{children}</div>
-      <button
-        className="inspector-resize"
-        aria-label={t("Resize configuration details")}
-        title={t(
-          "Drag to resize; use arrow keys to adjust; double-click to reset",
-        )}
-        onDoubleClick={() => setSize(null)}
-        onPointerDown={(e) => {
-          if (e.button !== 0) return;
-          const rect = panel.current.getBoundingClientRect();
-          drag.current = {
-            id: e.pointerId,
-            x: e.clientX,
-            y: e.clientY,
-            width: rect.width,
-            height: rect.height,
-          };
-          e.currentTarget.setPointerCapture(e.pointerId);
-          e.preventDefault();
-        }}
-        onPointerMove={(e) => {
-          const start = drag.current;
-          if (start?.id !== e.pointerId) return;
-          resize(
-            start.width + start.x - e.clientX,
-            start.height + e.clientY - start.y,
-          );
-        }}
-        onPointerUp={finish}
-        onPointerCancel={finish}
-        onLostPointerCapture={finish}
-        onKeyDown={(e) => {
-          if (
-            ![
-              "ArrowLeft",
-              "ArrowRight",
-              "ArrowUp",
-              "ArrowDown",
-              "Home",
-            ].includes(e.key)
-          )
-            return;
-          e.preventDefault();
-          if (e.key === "Home") {
-            setSize(null);
-            return;
+      {["width", "height", "both"].map((axis) => (
+        <button
+          key={axis}
+          className={
+            axis === "both" ? "inspector-resize" : `inspector-resize-${axis}`
           }
-          const rect = panel.current.getBoundingClientRect();
-          resize(
-            rect.width +
-              (e.key === "ArrowLeft" ? 10 : e.key === "ArrowRight" ? -10 : 0),
-            rect.height +
-              (e.key === "ArrowDown" ? 10 : e.key === "ArrowUp" ? -10 : 0),
-          );
-        }}
-      />
+          aria-label={t(
+            axis === "width"
+              ? "Resize configuration details width"
+              : axis === "height"
+                ? "Resize configuration details height"
+                : "Resize configuration details",
+          )}
+          title={t(
+            axis === "width"
+              ? "Drag to resize width; use left/right arrow keys; double-click to reset"
+              : axis === "height"
+                ? "Drag to resize height; use up/down arrow keys; double-click to reset"
+                : "Drag to resize; use arrow keys to adjust; double-click to reset",
+          )}
+          onDoubleClick={() => setSize(null)}
+          onPointerDown={(e) => {
+            if (e.button !== 0) return;
+            const rect = panel.current.getBoundingClientRect();
+            drag.current = {
+              axis,
+              id: e.pointerId,
+              x: e.clientX,
+              y: e.clientY,
+              width: rect.width,
+              height: rect.height,
+            };
+            e.currentTarget.setPointerCapture(e.pointerId);
+            e.preventDefault();
+          }}
+          onPointerMove={(e) => {
+            const start = drag.current;
+            if (start?.id !== e.pointerId || start.axis !== axis) return;
+            resize(
+              axis === "height"
+                ? start.width
+                : start.width + start.x - e.clientX,
+              axis === "width"
+                ? start.height
+                : start.height + e.clientY - start.y,
+            );
+          }}
+          onPointerUp={finish}
+          onPointerCancel={finish}
+          onLostPointerCapture={finish}
+          onKeyDown={(e) => {
+            if (
+              ![
+                ...(axis !== "height" ? ["ArrowLeft", "ArrowRight"] : []),
+                ...(axis !== "width" ? ["ArrowUp", "ArrowDown"] : []),
+                "Home",
+              ].includes(e.key)
+            )
+              return;
+            e.preventDefault();
+            if (e.key === "Home") {
+              setSize(null);
+              return;
+            }
+            const rect = panel.current.getBoundingClientRect();
+            resize(
+              rect.width +
+                (e.key === "ArrowLeft" ? 10 : e.key === "ArrowRight" ? -10 : 0),
+              rect.height +
+                (e.key === "ArrowDown" ? 10 : e.key === "ArrowUp" ? -10 : 0),
+            );
+          }}
+        />
+      ))}
     </aside>
   );
 }
