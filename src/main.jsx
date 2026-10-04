@@ -380,7 +380,7 @@ function App() {
   function toggleResourceDetails(node) {
     node =
       routingIndex.byId.get(routingIndex.canonicalId.get(node?.id)) || node;
-    const next = selected?.id === node.id ? null : node;
+    const next = selected?.id === node.id && detailsOpen ? null : node;
     setSelected(next);
     setDetailsOpen(Boolean(next));
   }
@@ -413,9 +413,7 @@ function App() {
     }
     const entry = routingIndex.entries.get(node.routingKey);
     if (entry) changeRoutingSelection(selectionForEntry(entry));
-    if (["route_config", "virtual_host"].includes(node.kind))
-      selectResource(node, false);
-    else toggleResourceDetails(node);
+    toggleResourceDetails(node);
   }
   function expandHost(key) {
     setRouting((current) => ({
