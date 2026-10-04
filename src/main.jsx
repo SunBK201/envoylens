@@ -43,6 +43,12 @@ import {
 import "./style.css";
 import "./floating-shell.css";
 import { readTheme, applyTheme } from "./theme";
+import {
+  readViewRoute,
+  writeViewRoute,
+  resourceRouteLocation,
+  restoreResourceRoute,
+} from "./view-route";
 import { parseConfig } from "./parser";
 import { fetchAdminConfig } from "./admin-fetch";
 import { originLabel } from "./node-fields";
@@ -144,28 +150,28 @@ function App() {
     [listener, setListener] = useState(""),
     [chain, setChain] = useState(""),
     [viewReady, setViewReady] = useState(false),
-    [view, setView] = useState(() => {
-      try {
-        const saved = window.localStorage.getItem("envoylens-active-view");
-        return ["graph", "routes", "list", "raw"].includes(saved)
-          ? saved
-          : "graph";
-      } catch {
-        return "graph";
-      }
-    }),
+    [view, setView] = useState(() =>
+      readViewRoute(window.location.hash, {
+        getItem: (key) => window.localStorage.getItem(key),
+      }),
+    ),
     [auto, setAuto] = useState(false),
     [remote, setRemote] = useState(""),
     [updated, setUpdated] = useState(""),
     [copied, setCopied] = useState(false),
     [storageMessage, setStorageMessage] = useState("");
+  const pendingLocation = useRef({ hash: window.location.hash, initial: true });
+  const replaceLocation = useRef(true);
+  const previousRouteModel = useRef(null);
+  const [locationRevision, setLocationRevision] = useState(0);
   useEffect(() => {
-    try {
-      window.localStorage.setItem("envoylens-active-view", view);
-    } catch {
-      // Keep navigation usable when browser storage is unavailable.
-    }
-  }, [view]);
+    const syncFromLocation = () => {
+      pendingLocation.current = { hash: window.location.hash, initial: false };
+      setLocationRevision((value) => value + 1);
+    };
+    window.addEventListener("hashchange", syncFromLocation);
+    return () => window.removeEventListener("hashchange", syncFromLocation);
+  }, []);
   const [library, setLibrary] = useState([]);
   const [activeConfigId, setActiveConfigId] = useState("");
   const [importName, setImportName] = useState("");
@@ -398,6 +404,82 @@ function App() {
       focusTarget,
     ],
   );
+  useEffect(() => {
+    // Wait for IndexedDB restoration; the initial demo is not the linked snapshot.
+    if (!viewReady) return;
+    const pending = pendingLocation.current;
+    if (pending) {
+      pendingLocation.current = null;
+      replaceLocation.current = true;
+      previousRouteModel.current = model;
+      setView(
+        readViewRoute(pending.hash, {
+          getItem: (key) => window.localStorage.getItem(key),
+        }),
+      );
+      // Bare initial URLs retain legacy local Listener/Filter Chain preferences.
+      if (
+        !pending.initial ||
+        pending.hash.includes("?") ||
+        pending.hash.split("/").length > 2
+      ) {
+        const restored = restoreResourceRoute(
+          pending.hash,
+          routingIndex,
+          identity,
+        );
+        setSelected(restored.selected);
+        setDetailsOpen(restored.detailsOpen);
+        setListener(restored.listener);
+        setChain(restored.chain);
+        setRouting((current) => ({
+          ...current,
+          selection: restored.selection,
+          focusedRoute: restored.focusedRoute,
+          expanded: restored.expanded,
+        }));
+        setQuery("");
+        setFocusTarget(restored.selected ? { id: restored.selected.id } : null);
+        graphReturn.current = null;
+        setRestoreGraphViewport(null);
+        setCanvasRevision((value) => value + 1);
+      }
+      // Ensure a second render even when the requested view is already active.
+      setLocationRevision((value) => value + 1);
+      return;
+    }
+    const location = resourceRouteLocation(routingIndex, identity, {
+      view,
+      selected,
+      detailsOpen,
+      listener,
+      chain,
+      selection: view === "routes" ? routingSelection : routing.selection,
+      focusedRoute: routing.focusedRoute,
+      expanded: routing.expanded,
+    });
+    writeViewRoute(window, view, {
+      ...location,
+      replace: replaceLocation.current || previousRouteModel.current !== model,
+    });
+    replaceLocation.current = false;
+    previousRouteModel.current = model;
+  }, [
+    viewReady,
+    locationRevision,
+    view,
+    model,
+    identity,
+    routingIndex,
+    selected,
+    detailsOpen,
+    listener,
+    chain,
+    routingSelection,
+    routing.selection,
+    routing.focusedRoute,
+    routing.expanded,
+  ]);
   function changeRoutingSelection(selection) {
     setRouting((current) => ({ ...current, selection }));
   }
