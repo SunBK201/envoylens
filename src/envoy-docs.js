@@ -1,6 +1,59 @@
 export const ENVOY_DOCS_BASE = "https://www.envoyproxy.io/docs/envoy/v1.20.0/";
+export const ENVOY_DOCS_KEY = "envoylens-docs-base";
+export function normalizeDocsBase(value) {
+  if (!value.trim()) return ENVOY_DOCS_BASE;
+  let url;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    throw new Error("Enter an absolute HTTP or HTTPS documentation URL.");
+  }
+  if (
+    !["http:", "https:"].includes(url.protocol) ||
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash
+  )
+    throw new Error(
+      "Use an HTTP or HTTPS URL without credentials, query parameters, or fragments.",
+    );
+  url.pathname = url.pathname.replace(/\/index\.html\/?$/, "/");
+  url.pathname = url.pathname.replace(/\/+$/, "") + "/";
+  return url.href;
+}
+export function readDocsBase(storage) {
+  try {
+    return normalizeDocsBase(storage?.getItem(ENVOY_DOCS_KEY) || "");
+  } catch {
+    return ENVOY_DOCS_BASE;
+  }
+}
+let docsBase = ENVOY_DOCS_BASE;
+try {
+  docsBase = readDocsBase(window.localStorage);
+} catch {}
+const listeners = new Set();
+export const getDocsBase = () => docsBase;
+export const subscribeDocsBase = (listener) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+export function saveDocsBase(value, storage) {
+  const next = normalizeDocsBase(value);
+  try {
+    (storage ?? window.localStorage).setItem(ENVOY_DOCS_KEY, next);
+  } catch {
+    throw new Error(
+      "Unable to save the documentation URL. Browser storage may be disabled.",
+    );
+  }
+  docsBase = next;
+  for (const listener of listeners) listener();
+  return next;
+}
 const api = (file, message) =>
-  `api-v3/${file}.proto#envoy-v3-api-msg-${message.toLowerCase().replace(/[._]/g, "-")}`;
+  `api-v3/${file}.proto.html#envoy-v3-api-msg-${message.toLowerCase().replace(/[._]/g, "-")}`;
 const listener = "config/listener/v3/listener_components";
 const route = "config/route/v3/route_components";
 const hcm =
@@ -53,7 +106,7 @@ const extensions = [
     `extensions.filters.${category}.${name}.v3.${message}`,
   ),
 }));
-export function envoyReference(node) {
+export function envoyReference(node, base = getDocsBase()) {
   if (!node) return null;
   const detail = node.detail || {};
   let path = resources[node.kind];
@@ -69,7 +122,7 @@ export function envoyReference(node) {
     if (extension) path = extension.path;
     else
       note =
-        "No extension-specific Envoy 1.20 documentation found. Showing the generic filter reference.";
+        "No extension-specific Envoy documentation found. Showing the generic filter reference.";
   }
   if (node.kind === "action")
     path = api(
@@ -81,7 +134,7 @@ export function envoyReference(node) {
   if (!path) {
     path = "api-v3/api.html";
     note =
-      "No dedicated reference is mapped for this resource. Showing the Envoy 1.20 API index.";
+      "No dedicated reference is mapped for this resource. Showing the Envoy API index.";
   }
-  return { url: ENVOY_DOCS_BASE + path, note };
+  return { url: normalizeDocsBase(base) + path, note };
 }

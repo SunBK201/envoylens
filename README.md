@@ -89,3 +89,14 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o bin
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o bin/envoylens-darwin-arm64 .
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/envoylens-windows-amd64.exe .
 ```
+
+### Custom Envoy reference URL
+
+Use the book icon (Documentation settings) in the bottom-right corner to set a
+versioned documentation root or compatible mirror. A home URL ending in `/index.html`
+is automatically normalized to its containing directory. Resource details and node previews
+update immediately after saving. The setting is stored in the current browser.
+Leave the field blank or restore the default and save to use the original v1.20.0 root.
+Only HTTP/HTTPS URLs without credentials, query parameters, or fragments are accepted.
+Existing API paths and anchors are retained; availability in other versions or mirrors
+is not automatically verified.

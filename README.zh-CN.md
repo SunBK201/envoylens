@@ -103,3 +103,11 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o bin
 CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -trimpath -ldflags="-s -w" -o bin/envoylens-darwin-arm64 .
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bin/envoylens-windows-amd64.exe .
 ```
+
+### 自定义 Envoy 参考文档地址
+
+点击界面右下角的书本图标（文档设置），填写指定版本的文档根地址或兼容的内网镜像。
+也可直接粘贴以 `/index.html` 结尾的首页地址，保存时会自动转换为所在目录。
+保存后，资源详情和节点预览的参考链接立即更新，设置保存在当前浏览器中。
+留空或点击“恢复默认”后保存即可恢复 v1.20.0。仅支持 HTTP/HTTPS，不能包含认证信息、查询参数或片段。
+资源的 API 路径与锚点仍沿用现有映射；切换版本或镜像不会自动验证目标页面是否存在。

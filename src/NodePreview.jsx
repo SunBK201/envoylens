@@ -1,9 +1,9 @@
 import { t, nodeLabel } from "./i18n";
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import JsonCode from "./JsonCode";
 import { ArrowUpRight } from "lucide-react";
-import { envoyReference } from "./envoy-docs";
+import { envoyReference, subscribeDocsBase, getDocsBase } from "./envoy-docs";
 
 export default function NodePreview({
   node,
@@ -13,7 +13,8 @@ export default function NodePreview({
   onLeave,
   onClose,
 }) {
-  const reference = envoyReference(node);
+  const docsBase = useSyncExternalStore(subscribeDocsBase, getDocsBase);
+  const reference = envoyReference(node, docsBase);
   const width = Math.min(420, window.innerWidth - 24);
   const height = Math.min(360, window.innerHeight - 24);
   let left = rect.right + 12;
@@ -47,7 +48,7 @@ export default function NodePreview({
       {reference && (
         <div className="envoy-reference">
           <a href={reference.url} target="_blank" rel="noopener noreferrer">
-            {t("Envoy 1.20 reference")}
+            {t("Envoy reference")}
             <ArrowUpRight size={14} />
           </a>
           {reference.note && <small>{t(reference.note)}</small>}

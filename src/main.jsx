@@ -39,6 +39,7 @@ import {
   Monitor,
   Sun,
   Moon,
+  BookOpen,
 } from "lucide-react";
 import "./style.css";
 import "./floating-shell.css";
@@ -67,7 +68,13 @@ import {
   retainRoutingState,
 } from "./routing-model";
 import "./routing.css";
-import { envoyReference } from "./envoy-docs";
+import {
+  envoyReference,
+  ENVOY_DOCS_BASE,
+  getDocsBase,
+  subscribeDocsBase,
+  saveDocsBase,
+} from "./envoy-docs";
 import { retainRefreshView } from "./refresh-view";
 import { sortedResources } from "./resource-sort";
 import {
@@ -115,6 +122,10 @@ function Graph(props) {
   return <RelationshipGraph {...props} meta={meta} />;
 }
 function App() {
+  const docsBase = useSyncExternalStore(subscribeDocsBase, getDocsBase);
+  const [docsDraft, setDocsDraft] = useState(docsBase);
+  const [docsError, setDocsError] = useState("");
+
   const language = useSyncExternalStore(
     subscribeLanguage,
     getLanguage,
@@ -919,7 +930,7 @@ function App() {
     return [...groups].filter(([, nodes]) => nodes.length);
   }, [model, query, view]);
   const details = selected?.detail ?? model.raw;
-  const reference = envoyReference(selected);
+  const reference = envoyReference(selected, docsBase);
   useEffect(() => {
     if (!viewReady) {
       document.title = "EnvoyLens";
@@ -1652,7 +1663,7 @@ function App() {
                         target="_blank"
                         rel="noopener noreferrer"
                       >
-                        {t("Envoy 1.20 reference")}
+                        {t("Envoy reference")}
                         <ArrowUpRight size={14} />
                       </a>
                       {reference.note && <small>{t(reference.note)}</small>}
@@ -1723,6 +1734,17 @@ function App() {
               )}
             </div>
             <div className="appearance-controls">
+              <button
+                title={t("Documentation settings")}
+                aria-label={t("Documentation settings")}
+                onClick={() => {
+                  setDocsDraft(docsBase);
+                  setDocsError("");
+                  setModal("docs");
+                }}
+              >
+                <BookOpen size={17} />
+              </button>
               <button
                 className="language-toggle"
                 title={t("Change language")}
@@ -1797,35 +1819,91 @@ function App() {
             <div className="modal-title">
               <div>
                 <h2 id="import-title">
-                  {modal === "manage"
-                    ? t("Manage configurations")
-                    : modal === "edit"
-                      ? t("Edit Envoy configuration")
-                      : t("Import Envoy configuration")}
+                  {modal === "docs"
+                    ? t("Documentation settings")
+                    : modal === "manage"
+                      ? t("Manage configurations")
+                      : modal === "edit"
+                        ? t("Edit Envoy configuration")
+                        : t("Import Envoy configuration")}
                 </h2>
                 <p>
-                  {modal === "manage"
-                    ? t("Switch, rename, edit, or delete saved configurations.")
-                    : t(
-                        "Connect to a live instance or inspect an offline configuration.",
-                      )}
+                  {modal === "docs"
+                    ? t(
+                        "Use a versioned Envoy documentation root or a compatible mirror. Resource paths are appended automatically.",
+                      )
+                    : modal === "manage"
+                      ? t(
+                          "Switch, rename, edit, or delete saved configurations.",
+                        )
+                      : t(
+                          "Connect to a live instance or inspect an offline configuration.",
+                        )}
                 </p>
               </div>
               <button
                 onClick={() => setModal(false)}
                 disabled={savingEdit}
                 aria-label={
-                  modal === "manage"
-                    ? t("Close configuration manager")
-                    : modal === "edit"
-                      ? t("Close editor")
-                      : t("Close import")
+                  modal === "docs"
+                    ? t("Close documentation settings")
+                    : modal === "manage"
+                      ? t("Close configuration manager")
+                      : modal === "edit"
+                        ? t("Close editor")
+                        : t("Close import")
                 }
               >
                 <X size={20} />
               </button>
             </div>
-            {modal === "manage" ? (
+            {modal === "docs" ? (
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  try {
+                    saveDocsBase(docsDraft);
+                    setModal(false);
+                  } catch (error) {
+                    setDocsError(error.message);
+                  }
+                }}
+              >
+                <label className="field-label" htmlFor="docs-base">
+                  {t("Documentation base URL")}
+                </label>
+                <input
+                  id="docs-base"
+                  style={{ width: "100%" }}
+                  value={docsDraft}
+                  placeholder={ENVOY_DOCS_BASE}
+                  onChange={(event) => {
+                    setDocsDraft(event.target.value);
+                    setDocsError("");
+                  }}
+                />
+                <p>
+                  {t(
+                    "Saved in this browser. Leave blank to use the default. The selected documentation must support the existing API paths.",
+                  )}
+                </p>
+                {docsError && <p role="alert">{t(docsError)}</p>}
+                <div className="modal-footer">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDocsDraft(ENVOY_DOCS_BASE);
+                      setDocsError("");
+                    }}
+                  >
+                    {t("Restore default")}
+                  </button>
+                  <button type="submit" className="primary">
+                    {t("Save")}
+                  </button>
+                </div>
+              </form>
+            ) : modal === "manage" ? (
               <>
                 <section
                   className="saved-config-library"

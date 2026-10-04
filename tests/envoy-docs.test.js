@@ -58,3 +58,113 @@ test("custom extension types get explicit generic fallback, not invented links",
   assert(!ref.url.includes("custom"));
   assert.equal(envoyReference(null), null);
 });
+
+test("custom roots preserve resource paths and anchors", () => {
+  for (const base of [
+    "https://example.com/docs/latest",
+    "http://docs.internal/envoy/v1.20.0/",
+  ]) {
+    assert.equal(
+      envoyReference({ kind: "cluster" }, base).url,
+      base.replace(/\/+$/, "") +
+        "/api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster",
+    );
+    assert(
+      envoyReference({ kind: "unknown" }, base).url.endsWith(
+        "/api-v3/api.html",
+      ),
+    );
+    assert(
+      envoyReference(
+        { kind: "http_filter", detail: { name: "envoy.filters.http.router" } },
+        base,
+      ).url.startsWith(base),
+    );
+  }
+});
+
+test("settings normalize, validate, persist, notify, and recover", async () => {
+  const {
+    normalizeDocsBase,
+    readDocsBase,
+    saveDocsBase,
+    getDocsBase,
+    subscribeDocsBase,
+    ENVOY_DOCS_KEY,
+  } = await import("../src/envoy-docs.js");
+  assert.equal(
+    normalizeDocsBase("  https://example.com/docs///  "),
+    "https://example.com/docs/",
+  );
+  assert.equal(normalizeDocsBase(" "), ENVOY_DOCS_BASE);
+  for (const value of [
+    "javascript:alert(1)",
+    "file:///tmp/docs",
+    "/docs",
+    "https://u:p@example.com/",
+    "https://example.com/?x=1",
+    "https://example.com/#api",
+  ]) {
+    assert.throws(() => normalizeDocsBase(value));
+    assert.equal(readDocsBase({ getItem: () => value }), ENVOY_DOCS_BASE);
+  }
+  assert.equal(
+    readDocsBase({
+      getItem() {
+        throw Error();
+      },
+    }),
+    ENVOY_DOCS_BASE,
+  );
+  let saved;
+  let notifications = 0;
+  const unsubscribe = subscribeDocsBase(() => notifications++);
+  const storage = {
+    setItem(key, value) {
+      assert.equal(key, ENVOY_DOCS_KEY);
+      saved = value;
+    },
+    getItem() {
+      return saved;
+    },
+  };
+  try {
+    saveDocsBase("https://example.com/docs", storage);
+    assert.equal(getDocsBase(), "https://example.com/docs/");
+    assert.equal(readDocsBase(storage), getDocsBase());
+    assert(envoyReference({ kind: "listener" }).url.startsWith(getDocsBase()));
+    assert.equal(notifications, 1);
+    assert.throws(
+      () =>
+        saveDocsBase("https://other.com", {
+          setItem() {
+            throw Error();
+          },
+        }),
+      /Unable to save/,
+    );
+    assert.equal(getDocsBase(), "https://example.com/docs/");
+    saveDocsBase("", storage);
+    assert.equal(getDocsBase(), ENVOY_DOCS_BASE);
+  } finally {
+    unsubscribe();
+    saveDocsBase("", storage);
+  }
+});
+
+test("documentation home URLs resolve to their containing directory", async () => {
+  const { normalizeDocsBase } = await import("../src/envoy-docs.js");
+  assert.equal(
+    normalizeDocsBase("http://10.74.67.57:8077/index.html"),
+    "http://10.74.67.57:8077/",
+  );
+  assert.equal(
+    normalizeDocsBase("https://example.com/envoy/v1.20.0/index.html"),
+    "https://example.com/envoy/v1.20.0/",
+  );
+  assert.equal(
+    envoyReference({ kind: "cluster" }, "http://10.74.67.57:8077/index.html")
+      .url,
+    "http://10.74.67.57:8077/api-v3/config/cluster/v3/cluster.proto.html#envoy-v3-api-msg-config-cluster-v3-cluster",
+  );
+});
