@@ -10,7 +10,7 @@
 .routing-graph-controls {
   position: absolute;
   z-index: 8;
-  bottom: max(14px, env(safe-area-inset-bottom));
+  bottom: max(22px, calc(env(safe-area-inset-bottom) + 8px));
   left: calc((100% + var(--nav-space) - 12px) / 2);
   right: auto;
   transform: translateX(-50%);
@@ -20,8 +20,8 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 9px 12px;
+  gap: 2px 8px;
+  padding: 5px 12px;
   border: 1px solid var(--glass-line);
   border-radius: 12px;
   background: var(--glass);
@@ -44,7 +44,7 @@
   font-size: 11px;
 }
 .routing-config-picker select,
-.routing-host-picker select {
+.routing-graph-controls select {
   min-width: 90px;
   width: 170px;
   max-width: 100%;
@@ -67,6 +67,11 @@
   transition:
     background-color 0.15s,
     border-color 0.15s;
+}
+.routing-host-picker select {
+  height: 28px;
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 .routing-config-picker select:hover,
 .routing-host-picker select:hover {
@@ -96,6 +101,10 @@
 .routing-graph-controls button:hover,
 .route-workbench button:hover {
   background: var(--palette-f1f5f9);
+}
+.routing-graph-controls button {
+  padding-top: 3px;
+  padding-bottom: 3px;
 }
 .routing-keep {
   display: flex;
@@ -403,7 +412,7 @@
 }
 @media (max-width: 1000px) {
   .routing-graph-controls {
-    gap: 5px;
+    gap: 2px 5px;
   }
   .routing-graph-controls select {
     width: 130px;
@@ -530,7 +539,7 @@
 
 @media (max-width: 1100px) {
   .routing-graph-controls {
-    bottom: calc(64px + env(safe-area-inset-bottom));
+    bottom: calc(72px + env(safe-area-inset-bottom));
     max-width: calc(100% - var(--nav-space) - 24px);
   }
   .floating-shell
