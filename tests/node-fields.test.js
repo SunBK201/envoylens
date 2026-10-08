@@ -7,12 +7,72 @@ import {
   lifecycleDescription,
   originLabel,
   duplicateLifecycleIds,
+  trafficDirection,
 } from "../src/node-fields.js";
 import { setLanguage } from "../src/i18n.js";
 const fields = (kind, detail, extra = {}) =>
   Object.fromEntries(
     nodeFields({ kind, detail, ...extra }).map((f) => [f.key, f.value]),
   );
+test("listener traffic direction reads snake/camel enum strings and numeric values", () => {
+  setLanguage("en");
+  for (const [raw, expected] of [
+    ["INBOUND", "INBOUND"],
+    [1, "INBOUND"],
+    ["OUTBOUND", "OUTBOUND"],
+    [2, "OUTBOUND"],
+    ["UNSPECIFIED", "UNSPECIFIED"],
+    [0, "UNSPECIFIED"],
+    [undefined, "UNSPECIFIED"],
+    [99, "UNKNOWN"],
+    ["FUTURE_DIRECTION", "UNKNOWN"],
+    [null, "UNSPECIFIED"],
+  ]) {
+    for (const key of ["traffic_direction", "trafficDirection"]) {
+      assert.equal(
+        trafficDirection({ kind: "listener", detail: { [key]: raw } }).value,
+        expected,
+      );
+    }
+  }
+  assert.equal(
+    trafficDirection({
+      kind: "cluster",
+      detail: { traffic_direction: "INBOUND" },
+    }),
+    null,
+  );
+  assert.equal(trafficDirection(undefined), null);
+});
+test("direction is independent of listener names, addresses and lifecycle states", () => {
+  setLanguage("zh");
+  for (const state of ["active", "warming", "draining", "static"]) {
+    const node = {
+      kind: "listener",
+      label: "virtualInbound",
+      state,
+      detail: {
+        address: { socket_address: { address: "0.0.0.0", port_value: 25006 } },
+      },
+    };
+    assert.equal(trafficDirection(node).label, "未定");
+    assert.equal(
+      trafficDirection({ ...node, detail: { traffic_direction: "OUTBOUND" } })
+        .label,
+      "出站",
+    );
+    assert.equal(
+      trafficDirection({ ...node, detail: { trafficDirection: 1 } }).label,
+      "入站",
+    );
+  }
+  setLanguage("en");
+  assert.equal(
+    trafficDirection({ kind: "listener", detail: { traffic_direction: 1 } })
+      .label,
+    "Inbound",
+  );
+});
 test("lifecycle badges are only shown for duplicate resources of the same kind and name", () => {
   setLanguage("en");
   const nodes = [

@@ -1,5 +1,5 @@
 import { nodeLabel } from "./i18n.js";
-import { lifecycleLabel } from "./node-fields.js";
+import { lifecycleLabel, trafficDirection } from "./node-fields.js";
 
 const field = (object, key) =>
   object?.[key] ??
@@ -35,6 +35,8 @@ export function navigationSearchText(node, owner) {
     node.clusterName,
     node.state,
     lifecycleLabel(node),
+    trafficDirection(node)?.value,
+    trafficDirection(node)?.label,
     detail.name,
     ...addressText(detail),
     node.kind === "cluster" && node.state !== "unresolved"

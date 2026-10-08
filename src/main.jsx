@@ -59,6 +59,7 @@ import {
   duplicateLifecycleIds,
 } from "./node-fields";
 import ResourceState from "./ResourceState";
+import TrafficDirection from "./TrafficDirection";
 import { configIdentity, restoreView, saveView } from "./view-storage";
 import { sample } from "./sample";
 import RelationshipGraph, { summary } from "./RelationshipGraph";
@@ -1357,7 +1358,12 @@ function App() {
                                 duplicateIds={duplicateIds}
                               />
                             </span>
-                            <small>{address(n.detail)}</small>
+                            <small className="listener-address-line">
+                              <span className="resource-name">
+                                {address(n.detail)}
+                              </span>
+                              <TrafficDirection node={n} />
+                            </small>
                           </div>
                         </button>
                       ))}

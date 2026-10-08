@@ -312,5 +312,14 @@
   "Current configuration available to serve traffic.": "Current configuration available to serve traffic.",
   "Configuration preparing to serve traffic; not active yet.": "Configuration preparing to serve traffic; not active yet.",
   "Previous configuration draining before removal; not the current active configuration.": "Previous configuration draining before removal; not the current active configuration.",
-  "Counts include all listener lifecycle states, not just unique names.": "Counts include all listener lifecycle states, not just unique names."
+  "Counts include all listener lifecycle states, not just unique names.": "Counts include all listener lifecycle states, not just unique names.",
+  "Inbound": "Inbound",
+  "Outbound": "Outbound",
+  "Unspecified": "Unspecified",
+  "Unknown": "Unknown",
+  "Traffic direction: {0}": "Traffic direction: {0}",
+  "Incoming traffic (traffic_direction: INBOUND).": "Incoming traffic (traffic_direction: INBOUND).",
+  "Outgoing traffic (traffic_direction: OUTBOUND).": "Outgoing traffic (traffic_direction: OUTBOUND).",
+  "Traffic direction is unspecified; not inferred from the listener name or port.": "Traffic direction is unspecified; not inferred from the listener name or port.",
+  "Unrecognized traffic_direction: {0}": "Unrecognized traffic_direction: {0}"
 }

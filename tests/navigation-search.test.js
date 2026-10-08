@@ -57,6 +57,35 @@ const matchingIds = (query) =>
     .flat()
     .map((n) => n.id);
 
+test("listeners can be searched by configured direction in both languages", () => {
+  for (const locale of ["en", "zh"]) {
+    setLanguage(locale);
+    const nodes = ["INBOUND", "OUTBOUND", "UNSPECIFIED"].map((direction) => ({
+      ...listener,
+      id: direction,
+      detail: { ...listener.detail, traffic_direction: direction },
+    }));
+    const index = new Map(nodes.map((n) => [n.id, navigationSearchText(n)]));
+    for (const [value, label] of [
+      ["INBOUND", "Inbound"],
+      ["OUTBOUND", "Outbound"],
+      ["UNSPECIFIED", "Unspecified"],
+    ]) {
+      for (const query of [value, t(label)]) {
+        assert.deepEqual(
+          filterNavigationResources(
+            { listener: nodes },
+            index,
+            query,
+          ).listener.map((n) => n.id),
+          [value],
+        );
+      }
+    }
+  }
+  setLanguage("en");
+});
+
 test("same-name listeners can be filtered by English or translated lifecycle state", () => {
   setLanguage("zh");
   const snapshots = ["active", "draining"].map((state) => ({

@@ -317,5 +317,14 @@
   "Current configuration available to serve traffic.": "当前生效配置，可承载流量。",
   "Configuration preparing to serve traffic; not active yet.": "配置正在预热，尚未生效。",
   "Previous configuration draining before removal; not the current active configuration.": "旧配置正在排空，等待移除；不是当前生效配置。",
-  "Counts include all listener lifecycle states, not just unique names.": "数量包含 Listener 的各个生命周期状态，不是按名称去重后的数量。"
+  "Counts include all listener lifecycle states, not just unique names.": "数量包含 Listener 的各个生命周期状态，不是按名称去重后的数量。",
+  "Inbound": "入站",
+  "Outbound": "出站",
+  "Unspecified": "未定",
+  "Unknown": "未知",
+  "Traffic direction: {0}": "流量方向：{0}",
+  "Incoming traffic (traffic_direction: INBOUND).": "入站流量（traffic_direction: INBOUND）。",
+  "Outgoing traffic (traffic_direction: OUTBOUND).": "出站流量（traffic_direction: OUTBOUND）。",
+  "Traffic direction is unspecified; not inferred from the listener name or port.": "配置未指定流量方向，不根据 Listener 名称或端口推断。",
+  "Unrecognized traffic_direction: {0}": "无法识别的 traffic_direction：{0}"
 }

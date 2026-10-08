@@ -46,6 +46,42 @@ export function originLabel(n) {
       ? "xDS"
       : "";
 }
+// Only the Listener's explicit enum identifies direction; names and ports do not.
+export function trafficDirection(n) {
+  if (n?.kind !== "listener") return null;
+  const raw = get(n.detail, "traffic_direction");
+  if (raw === "INBOUND" || raw === 1)
+    return {
+      value: "INBOUND",
+      label: translateUI("Inbound"),
+      description: translateUI(
+        "Incoming traffic (traffic_direction: INBOUND).",
+      ),
+    };
+  if (raw === "OUTBOUND" || raw === 2)
+    return {
+      value: "OUTBOUND",
+      label: translateUI("Outbound"),
+      description: translateUI(
+        "Outgoing traffic (traffic_direction: OUTBOUND).",
+      ),
+    };
+  if (raw == null || raw === "UNSPECIFIED" || raw === 0)
+    return {
+      value: "UNSPECIFIED",
+      label: translateUI("Unspecified"),
+      description: translateUI(
+        "Traffic direction is unspecified; not inferred from the listener name or port.",
+      ),
+    };
+  return {
+    value: "UNKNOWN",
+    label: translateUI("Unknown"),
+    description: translateUI("Unrecognized traffic_direction: {0}", [
+      format(raw),
+    ]),
+  };
+}
 export function nodeFields(n) {
   const d = n.detail || {},
     fields = [];
