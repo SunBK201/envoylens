@@ -5,6 +5,7 @@ import {
   filterNavigationResources,
 } from "../src/navigation-search.js";
 import { sortedResources } from "../src/resource-sort.js";
+import { setLanguage, t } from "../src/i18n.js";
 
 const listener = {
   id: "listener",
@@ -55,6 +56,27 @@ const matchingIds = (query) =>
   Object.values(filterNavigationResources(groups, index, query))
     .flat()
     .map((n) => n.id);
+
+test("same-name listeners can be filtered by English or translated lifecycle state", () => {
+  setLanguage("zh");
+  const snapshots = ["active", "draining"].map((state) => ({
+    ...listener,
+    id: state,
+    state,
+  }));
+  const groups = { listener: snapshots };
+  const index = new Map(snapshots.map((n) => [n.id, navigationSearchText(n)]));
+  for (const query of ["draining", t("Draining")]) {
+    assert.deepEqual(
+      filterNavigationResources(groups, index, `Ingress ${query}`).listener.map(
+        (n) => n.id,
+      ),
+      ["draining"],
+    );
+  }
+  assert(navigationSearchText(chain, snapshots[1]).includes(t("Draining")));
+  setLanguage("en");
+});
 
 test("navigation search is case-insensitive and matches names, addresses and types", () => {
   assert.deepEqual(matchingIds("  sErViCe[2]  "), ["cluster", "endpoint"]);

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { retainRefreshView } from "../src/refresh-view.js";
+import { parseConfig } from "../src/parser.js";
 const node = (id, kind, label, detail = {}) => ({
   id,
   kind,
@@ -32,6 +33,53 @@ const next = {
     { source: "5", target: "6" },
   ],
 };
+test("refresh keeps active and draining listeners distinct and removes expired snapshots", () => {
+  const parse = (names, draining = true) =>
+    parseConfig(
+      JSON.stringify({
+        configs: [
+          {
+            dynamic_listeners: names.map((name) => ({
+              name,
+              active_state: { listener: { name } },
+              ...(draining ? { draining_state: { listener: { name } } } : {}),
+            })),
+          },
+        ],
+      }),
+    );
+  const before = parse(["http"]);
+  const after = parse(["inserted", "http"]);
+  for (const state of ["active", "draining"]) {
+    const selected = before.nodes.find(
+      (n) => n.kind === "listener" && n.state === state,
+    );
+    const retained = retainRefreshView(before, after, {
+      listener: selected.id,
+      selected,
+      detailsOpen: true,
+    });
+    assert.equal(retained.selected.label, "http");
+    assert.equal(retained.selected.state, state);
+    assert.equal(retained.listener, retained.selected.id);
+  }
+  const selected = before.nodes.find(
+    (n) => n.kind === "listener" && n.state === "draining",
+  );
+  assert.deepEqual(
+    retainRefreshView(before, parse(["inserted", "http"], false), {
+      listener: selected.id,
+      selected,
+      detailsOpen: true,
+    }),
+    {
+      listener: "",
+      chain: "",
+      selected: null,
+      detailsOpen: false,
+    },
+  );
+});
 test("refresh retains resource selection after IDs shift and contents change", () => {
   const state = retainRefreshView(previous, next, {
     listener: "1",

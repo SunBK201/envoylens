@@ -304,5 +304,13 @@
   "Resize resource navigation height": "Resize resource navigation height",
   "Default": "Default",
   "Unable to load field documentation. Hover again to retry.": "Unable to load field documentation. Hover again to retry.",
-  "No schema documentation for this field.": "No schema documentation for this field."
+  "No schema documentation for this field.": "No schema documentation for this field.",
+  "Active": "Active",
+  "Warming": "Warming",
+  "Draining": "Draining",
+  "Lifecycle state: {0}": "Lifecycle state: {0}",
+  "Current configuration available to serve traffic.": "Current configuration available to serve traffic.",
+  "Configuration preparing to serve traffic; not active yet.": "Configuration preparing to serve traffic; not active yet.",
+  "Previous configuration draining before removal; not the current active configuration.": "Previous configuration draining before removal; not the current active configuration.",
+  "Counts include all listener lifecycle states, not just unique names.": "Counts include all listener lifecycle states, not just unique names."
 }

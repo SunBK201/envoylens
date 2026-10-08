@@ -309,5 +309,13 @@
   "Resize resource navigation height": "调整资源导航高度",
   "Default": "默认值",
   "Unable to load field documentation. Hover again to retry.": "字段文档加载失败，请重新悬停重试。",
-  "No schema documentation for this field.": "Schema 中未找到此字段的文档。"
+  "No schema documentation for this field.": "Schema 中未找到此字段的文档。",
+  "Active": "生效中",
+  "Warming": "预热中",
+  "Draining": "排空中",
+  "Lifecycle state: {0}": "生命周期状态：{0}",
+  "Current configuration available to serve traffic.": "当前生效配置，可承载流量。",
+  "Configuration preparing to serve traffic; not active yet.": "配置正在预热，尚未生效。",
+  "Previous configuration draining before removal; not the current active configuration.": "旧配置正在排空，等待移除；不是当前生效配置。",
+  "Counts include all listener lifecycle states, not just unique names.": "数量包含 Listener 的各个生命周期状态，不是按名称去重后的数量。"
 }

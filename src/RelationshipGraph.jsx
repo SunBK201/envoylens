@@ -8,10 +8,17 @@ import React, {
 } from "react";
 import { Scan } from "lucide-react";
 import NodePreview from "./NodePreview";
+import ResourceState from "./ResourceState";
 import { layoutGraph, graphGeometry, displayTitle } from "./layout";
 import { graphConnections } from "./graph-connections";
 import { visibleGraph } from "./graph-viewport";
-import { nodeFields, summary, fieldLabels, originLabel } from "./node-fields";
+import {
+  nodeFields,
+  summary,
+  fieldLabels,
+  originLabel,
+  lifecycleLabel,
+} from "./node-fields";
 export { summary } from "./node-fields";
 const DEFAULT_ZOOM = 0.65;
 const CANVAS_PADDING = 160;
@@ -37,6 +44,7 @@ function reach(start, edges, reverse = false) {
 }
 export default function RelationshipGraph({
   model,
+  duplicateIds,
   searchNodes = model.nodes,
   routingIndex,
   onLocate,
@@ -422,6 +430,7 @@ export default function RelationshipGraph({
       {preview && (
         <NodePreview
           node={preview.node}
+          duplicateIds={duplicateIds}
           rect={preview.rect}
           kind={meta[preview.node.kind]?.[0]}
           onEnter={cancelPreviewTimer}
@@ -590,7 +599,7 @@ export default function RelationshipGraph({
                 }}
                 onMouseEnter={(event) => queuePreview(n, event.currentTarget)}
                 onMouseLeave={leavePreview}
-                aria-label={`${meta[n.kind]?.[0]}: ${nodeLabel(n)}`}
+                aria-label={`${meta[n.kind]?.[0]}: ${nodeLabel(n)}${lifecycleLabel(n, duplicateIds) ? ` · ${lifecycleLabel(n, duplicateIds)}` : ""}`}
                 onClick={() => {
                   closePreview();
                   onNodeClick(n);
@@ -598,6 +607,7 @@ export default function RelationshipGraph({
               >
                 <span className="relationship-kind">
                   <span>{meta[n.kind]?.[0]}</span>
+                  <ResourceState node={n} duplicateIds={duplicateIds} />
                   <em
                     title={t(
                       "Configuration origin, independent of lifecycle state or cluster type",

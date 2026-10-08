@@ -53,7 +53,12 @@ import {
 } from "./view-route";
 import { parseConfig } from "./parser";
 import { fetchAdminConfig } from "./admin-fetch";
-import { originLabel } from "./node-fields";
+import {
+  originLabel,
+  lifecycleLabel,
+  duplicateLifecycleIds,
+} from "./node-fields";
+import ResourceState from "./ResourceState";
 import { configIdentity, restoreView, saveView } from "./view-storage";
 import { sample } from "./sample";
 import RelationshipGraph, { summary } from "./RelationshipGraph";
@@ -344,6 +349,10 @@ function App() {
       localStorage.setItem("envoylens-nav-sort", sortDirection);
     } catch {}
   }, [sortDirection]);
+  const duplicateIds = useMemo(
+    () => duplicateLifecycleIds(model.nodes),
+    [model],
+  );
   const navigation = useMemo(() => {
     const groups = Object.fromEntries(
       ["listener", "filter_chain", "cluster", "endpoint"].map((kind) => [
@@ -1319,6 +1328,9 @@ function App() {
                       <summary
                         className="nav-section"
                         onClick={(event) => toggleNavGroup(event, "listener")}
+                        title={t(
+                          "Counts include all listener lifecycle states, not just unique names.",
+                        )}
                       >
                         <Radio size={18} strokeWidth={2.2} aria-hidden="true" />
                         LISTENERS <span>{navCount("listener")}</span>
@@ -1326,7 +1338,9 @@ function App() {
                       {orderedResources("listener").map((n) => (
                         <button
                           key={n.id}
-                          title={nodeLabel(n)}
+                          title={[nodeLabel(n), lifecycleLabel(n, duplicateIds)]
+                            .filter(Boolean)
+                            .join(" · ")}
                           className={`nav-item listener-item ${listener === n.id ? "active" : ""}`}
                           onClick={() => {
                             changeListener(n.id);
@@ -1334,7 +1348,15 @@ function App() {
                         >
                           <Radio size={16} aria-hidden="true" />
                           <div>
-                            {nodeLabel(n)}
+                            <span className="resource-name-line">
+                              <span className="resource-name">
+                                {nodeLabel(n)}
+                              </span>
+                              <ResourceState
+                                node={n}
+                                duplicateIds={duplicateIds}
+                              />
+                            </span>
                             <small>{address(n.detail)}</small>
                           </div>
                         </button>
@@ -1370,7 +1392,17 @@ function App() {
                             <Layers size={16} aria-hidden="true" />
                             <div>
                               {nodeLabel(n)}
-                              {owner && <small>{nodeLabel(owner)}</small>}
+                              {owner && (
+                                <small className="resource-name-line">
+                                  <span className="resource-name">
+                                    {nodeLabel(owner)}
+                                  </span>
+                                  <ResourceState
+                                    node={owner}
+                                    duplicateIds={duplicateIds}
+                                  />
+                                </small>
+                              )}
                             </div>
                           </button>
                         );
@@ -1393,13 +1425,23 @@ function App() {
                       {orderedResources("cluster").map((n) => (
                         <button
                           key={n.id}
-                          title={nodeLabel(n)}
+                          title={[nodeLabel(n), lifecycleLabel(n, duplicateIds)]
+                            .filter(Boolean)
+                            .join(" · ")}
                           className={`nav-item listener-item ${selected?.id === n.id ? "active" : ""}`}
                           onClick={() => navigateCluster(n)}
                         >
                           <Network size={16} aria-hidden="true" />
                           <div>
-                            {nodeLabel(n)}
+                            <span className="resource-name-line">
+                              <span className="resource-name">
+                                {nodeLabel(n)}
+                              </span>
+                              <ResourceState
+                                node={n}
+                                duplicateIds={duplicateIds}
+                              />
+                            </span>
                             {n.state !== "unresolved" && (
                               <small>
                                 {n.detail.type ??
@@ -1606,6 +1648,7 @@ function App() {
                 <div className="routing-graph-view" hidden={view !== "graph"}>
                   <Graph
                     model={graphModel}
+                    duplicateIds={duplicateIds}
                     searchNodes={routeScope.nodes}
                     routingIndex={routingIndex}
                     onLocate={locateSearchResult}
@@ -1711,6 +1754,10 @@ function App() {
                             onClick={() => toggleResourceDetails(n)}
                           >
                             <strong>{nodeLabel(n)}</strong>
+                            <ResourceState
+                              node={n}
+                              duplicateIds={duplicateIds}
+                            />
                             <small
                               title={t(
                                 "Configuration origin, independent of lifecycle state or cluster type",
@@ -1755,6 +1802,7 @@ function App() {
                     </button>
                   </div>
                   <h2>{nodeLabel(selected)}</h2>
+                  <ResourceState node={selected} duplicateIds={duplicateIds} />
                   {reference && (
                     <div className="envoy-reference">
                       <a

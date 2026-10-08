@@ -837,6 +837,17 @@ main {
   margin: -6px 0 16px;
   font-size: 13px;
 }
+.inspector-content > .resource-state,
+.node-preview > .resource-state {
+  display: block;
+  width: fit-content;
+  align-self: flex-start;
+  margin-bottom: 10px;
+}
+.inspector-content > .resource-state + .envoy-reference,
+.node-preview > .resource-state + .envoy-reference {
+  margin-top: 0;
+}
 .envoy-reference a {
   display: inline-flex;
   align-items: center;

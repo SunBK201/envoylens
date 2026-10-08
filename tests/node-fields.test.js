@@ -1,10 +1,81 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { nodeFields, summary } from "../src/node-fields.js";
+import {
+  nodeFields,
+  summary,
+  lifecycleLabel,
+  lifecycleDescription,
+  originLabel,
+  duplicateLifecycleIds,
+} from "../src/node-fields.js";
+import { setLanguage } from "../src/i18n.js";
 const fields = (kind, detail, extra = {}) =>
   Object.fromEntries(
     nodeFields({ kind, detail, ...extra }).map((f) => [f.key, f.value]),
   );
+test("lifecycle badges are only shown for duplicate resources of the same kind and name", () => {
+  setLanguage("en");
+  const nodes = [
+    { id: "l1", kind: "listener", label: "http", state: "active" },
+    { id: "l2", kind: "listener", label: "http", state: "draining" },
+    { id: "l3", kind: "listener", label: "unique", state: "active" },
+    { id: "l4", kind: "listener", label: "warming-only", state: "warming" },
+    { id: "c1", kind: "cluster", label: "http", state: "active" },
+    { id: "c2", kind: "cluster", label: "backend", state: "active" },
+    { id: "c3", kind: "cluster", label: "backend", state: "warming" },
+    { id: "r1", kind: "route", label: "unique", state: "active" },
+  ];
+  const duplicateIds = duplicateLifecycleIds(nodes);
+  assert.deepEqual([...duplicateIds], ["l1", "l2", "c2", "c3"]);
+  assert.deepEqual(
+    nodes.map((n) => lifecycleLabel(n, duplicateIds)),
+    ["Active", "Draining", "", "", "", "Active", "Warming", ""],
+  );
+  // Selecting or filtering to one snapshot must not hide its distinguishing badge.
+  assert.equal(lifecycleLabel(nodes[0], duplicateIds), "Active");
+  // A refresh that removes the old snapshot also removes the active badge.
+  const refreshed = nodes.filter((n) => n.id !== "l2" && n.id !== "c3");
+  const refreshedIds = duplicateLifecycleIds(refreshed);
+  assert.equal(refreshedIds.size, 0);
+  assert(refreshed.every((n) => lifecycleLabel(n, refreshedIds) === ""));
+  assert.equal(duplicateLifecycleIds([]).size, 0);
+});
+test("runtime resource lifecycle labels are separate from origin and discovery type", () => {
+  setLanguage("en");
+  for (const kind of ["listener", "cluster"]) {
+    for (const [state, label] of [
+      ["active", "Active"],
+      ["warming", "Warming"],
+      ["draining", "Draining"],
+    ]) {
+      const n = { kind, state, origin: "xds", detail: { type: "EDS" } };
+      assert.equal(lifecycleLabel(n), label);
+      assert(lifecycleDescription(n));
+      assert.equal(originLabel(n), "xDS");
+    }
+  }
+  for (const n of [
+    undefined,
+    { kind: "listener", state: "static" },
+    { kind: "listener", state: "configured" },
+    { kind: "cluster", state: "unresolved" },
+    { kind: "route", state: "active" },
+  ]) {
+    assert.equal(lifecycleLabel(n), "");
+    assert.equal(lifecycleDescription(n), "");
+  }
+});
+test("runtime resource lifecycle labels support Chinese without changing names", () => {
+  setLanguage("zh");
+  for (const state of ["active", "warming", "draining"]) {
+    const n = { kind: "listener", state, label: "127.0.0.1_17111" };
+    assert.notEqual(lifecycleLabel(n), state);
+    assert.match(lifecycleLabel(n), /[\u4e00-\u9fff]/);
+    assert.match(lifecycleDescription(n), /[\u4e00-\u9fff]/);
+    assert.equal(n.label, "127.0.0.1_17111");
+  }
+  setLanguage("en");
+});
 test("listener key fields include address, port and direction", () => {
   assert.deepEqual(
     fields("listener", {

@@ -64,6 +64,72 @@ test("config_dump resolves RDS and preserves warming state", () => {
   assert(!m.nodes.some((n) => n.state === "unresolved"));
   assert(m.edges.some((e) => e.label === "RDS reference"));
 });
+test("one dynamic listener can contain distinct active, warming and draining snapshots", () => {
+  const current = listener({ rds: { route_config_name: "rds" } });
+  const old = listener({ route_config: { name: "old-routes" } });
+  const input = {
+    configs: [
+      {
+        dynamic_listeners: [
+          {
+            name: "http",
+            active_state: { listener: current },
+            warming_state: { listener: current },
+            draining_state: { listener: old },
+          },
+        ],
+      },
+      { dynamic_route_configs: [{ route_config: rc }] },
+      { dynamic_active_clusters: [{ cluster: { name: "backend" } }] },
+    ],
+  };
+  const m = parse(input);
+  const snapshots = m.nodes.filter((n) => n.kind === "listener");
+  assert.equal(input.configs[0].dynamic_listeners.length, 1);
+  assert.deepEqual(
+    snapshots.map((n) => n.state),
+    ["active", "warming", "draining"],
+  );
+  assert.equal(new Set(snapshots.map((n) => n.id)).size, 3);
+  assert(snapshots.every((n) => n.label === "http"));
+  assert(snapshots.every((n) => n.path.endsWith(`.${n.state}_state.listener`)));
+  assert.deepEqual(snapshots[0].detail, current);
+  assert.deepEqual(snapshots[2].detail, old);
+  // Each snapshot owns a separate filter-chain graph, even for identical JSON.
+  for (const n of snapshots) {
+    const chains = m.edges
+      .filter((e) => e.source === n.id)
+      .map((e) => m.nodes.find((child) => child.id === e.target))
+      .filter((child) => child.kind === "filter_chain");
+    assert.equal(chains.length, 1);
+    assert.equal(chains[0].state, n.state);
+  }
+  assert.deepEqual(parse(input), m);
+  delete input.configs[0].dynamic_listeners[0].warming_state;
+  delete input.configs[0].dynamic_listeners[0].draining_state;
+  const refreshed = parse(input).nodes.filter((n) => n.kind === "listener");
+  assert.equal(refreshed.length, 1);
+  assert.equal(refreshed[0].state, "active");
+});
+test("lowerCamelCase listener snapshots preserve same-name lifecycle states", () => {
+  const m = parse({
+    configs: [
+      {
+        dynamicListeners: [
+          {
+            name: "http",
+            activeState: { listener: { name: "http" } },
+            drainingState: { listener: { name: "http" } },
+          },
+        ],
+      },
+    ],
+  });
+  assert.deepEqual(
+    m.nodes.filter((n) => n.kind === "listener").map((n) => n.state),
+    ["active", "draining"],
+  );
+});
 test("unresolved RDS and cluster references are explicit", () => {
   const m = parse({
     static_resources: {

@@ -1,4 +1,5 @@
 import { nodeLabel } from "./i18n.js";
+import { lifecycleLabel } from "./node-fields.js";
 
 const field = (object, key) =>
   object?.[key] ??
@@ -33,6 +34,7 @@ export function navigationSearchText(node, owner) {
     node.kind?.replaceAll("_", " "),
     node.clusterName,
     node.state,
+    lifecycleLabel(node),
     detail.name,
     ...addressText(detail),
     node.kind === "cluster" && node.state !== "unresolved"
@@ -43,6 +45,8 @@ export function navigationSearchText(node, owner) {
     field(match, "transport_protocol"),
     owner?.label,
     owner && nodeLabel(owner),
+    owner?.state,
+    lifecycleLabel(owner),
     ...addressText(owner?.detail),
   ]
     .filter((value) => value !== undefined && value !== null)

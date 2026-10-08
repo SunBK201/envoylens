@@ -8,6 +8,37 @@ const format = (v) =>
     : v !== null && typeof v === "object"
       ? JSON.stringify(v)
       : String(v);
+const lifecycleStates = {
+  active: ["Active", "Current configuration available to serve traffic."],
+  warming: [
+    "Warming",
+    "Configuration preparing to serve traffic; not active yet.",
+  ],
+  draining: [
+    "Draining",
+    "Previous configuration draining before removal; not the current active configuration.",
+  ],
+};
+// Count against the complete snapshot, not a filtered navigation or graph view.
+export function duplicateLifecycleIds(nodes) {
+  const groups = new Map();
+  for (const n of nodes) {
+    if (!["listener", "cluster"].includes(n.kind)) continue;
+    const key = JSON.stringify([n.kind, n.label]);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(n.id);
+  }
+  return new Set([...groups.values()].filter((ids) => ids.length > 1).flat());
+}
+export function lifecycleLabel(n, duplicateIds) {
+  if (!["listener", "cluster"].includes(n?.kind)) return "";
+  if (duplicateIds && !duplicateIds.has(n.id)) return "";
+  return translateUI(lifecycleStates[n.state]?.[0] || "");
+}
+export function lifecycleDescription(n) {
+  if (!lifecycleLabel(n)) return "";
+  return translateUI(lifecycleStates[n.state][1]);
+}
 export function originLabel(n) {
   return n.origin === "bootstrap"
     ? "Bootstrap"

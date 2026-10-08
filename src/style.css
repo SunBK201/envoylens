@@ -429,9 +429,54 @@ h1 > span {
   flex: none;
 }
 .listener-item > div {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.resource-name-line,
+.listener-item small.resource-name-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.resource-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.resource-state {
+  display: inline-block;
+  flex: none;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 17px;
+  white-space: nowrap;
+}
+.resource-list .resource-state {
+  width: auto;
+}
+.resource-state.resource-state-active {
+  color: var(--palette-208065);
+}
+.resource-state.resource-state-warming {
+  color: #97702c;
+}
+.resource-state.resource-state-draining {
+  color: #ac6d43;
+}
+:root[data-theme="dark"] .resource-state-warming {
+  color: #d6b26d;
+}
+:root[data-theme="dark"] .resource-state-draining {
+  color: #d99b72;
+}
+.relationship-kind > .resource-state {
+  margin-left: auto;
 }
 .listener-item small {
   display: block;

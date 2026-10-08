@@ -3,11 +3,13 @@ import { t, nodeLabel } from "./i18n";
 import React, { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import JsonCode from "./JsonCode";
+import ResourceState from "./ResourceState";
 import { ArrowUpRight } from "lucide-react";
 import { envoyReference, subscribeDocsBase, getDocsBase } from "./envoy-docs";
 
 export default function NodePreview({
   node,
+  duplicateIds,
   rect,
   kind,
   onEnter,
@@ -46,6 +48,7 @@ export default function NodePreview({
         </button>
       </div>
       <strong className="node-preview-name">{nodeLabel(node)}</strong>
+      <ResourceState node={node} duplicateIds={duplicateIds} />
       {reference && (
         <div className="envoy-reference">
           <a href={reference.url} target="_blank" rel="noopener noreferrer">
