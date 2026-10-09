@@ -146,3 +146,52 @@ test("HTTP origins without randomUUID can save, update and restore snapshots", a
     Object.defineProperty(globalThis, "crypto", original);
   }
 });
+
+test("Admin snapshots preserve each configuration's includeEds choice", async () => {
+  const enabled = await saveConfig({
+    text: "eds",
+    source: "eds",
+    remote: "http://eds:9901",
+    includeEds: true,
+  });
+  const disabled = await saveConfig({
+    text: "no-eds",
+    source: "no-eds",
+    remote: "http://no-eds:9901",
+    includeEds: false,
+  });
+  assert.equal((await readLastConfig()).includeEds, false);
+  await activateConfig(enabled.item.id);
+  assert.equal((await readLastConfig()).includeEds, true);
+  await saveConfig({ ...enabled.item, text: "refreshed" });
+  assert.equal((await readLastConfig()).includeEds, true);
+  await activateConfig(disabled.item.id);
+  assert.equal((await readLastConfig()).includeEds, false);
+});
+
+test("editing includeEds updates the saved choice without changing the active configuration", async () => {
+  const first = await saveConfig({
+    text: "first",
+    source: "first",
+    remote: "http://first:9901",
+    includeEds: false,
+  });
+  const second = await saveConfig({
+    text: "second",
+    source: "second",
+    remote: "http://second:9901",
+    includeEds: false,
+  });
+  const edited = await saveConfig(
+    { ...first.item, includeEds: true },
+    { activate: false },
+  );
+  assert.equal(edited.item.id, first.item.id);
+  assert.equal(edited.item.includeEds, true);
+  assert.equal((await readLastConfig()).id, second.item.id);
+  assert.equal((await readLastConfig()).includeEds, false);
+  await activateConfig(first.item.id);
+  assert.equal((await readLastConfig()).includeEds, true);
+  await saveConfig({ ...edited.item, includeEds: false });
+  assert.equal((await readLastConfig()).includeEds, false);
+});

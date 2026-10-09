@@ -39,7 +39,7 @@ func TestCustomHostAccess(t *testing.T) {
 
 func TestProxyWithoutOriginOrIdentifierRestrictions(t *testing.T) {
 	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet || r.URL.RequestURI() != "/config_dump?include_eds" {
+		if r.Method != http.MethodGet || r.URL.RequestURI() != "/config_dump" {
 			t.Errorf("unexpected upstream request: %s %s", r.Method, r.URL.RequestURI())
 		}
 		_, _ = w.Write([]byte(`{"configs":[]}`))
@@ -68,6 +68,7 @@ func TestAPIValidationRemainsEnforced(t *testing.T) {
 		method, path, body string
 		status             int
 	}{
+		{http.MethodPost, "/api/config", `{"address":"http://localhost:9901","includeEds":"false"}`, 400},
 		{http.MethodGet, "/api/config", "", 405},
 		{http.MethodOptions, "/api/config", "", 405},
 		{http.MethodPost, "/api/unknown", "{}", 404},
@@ -81,5 +82,34 @@ func TestAPIValidationRemainsEnforced(t *testing.T) {
 		if res.Code != tc.status {
 			t.Errorf("%s %s: got %d, want %d", tc.method, tc.path, res.Code, tc.status)
 		}
+	}
+}
+
+func TestIncludeEdsOption(t *testing.T) {
+	var requested string
+	admin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requested = r.URL.RequestURI()
+		if r.Method != http.MethodGet {
+			t.Errorf("unexpected upstream method: %s", r.Method)
+		}
+		_, _ = w.Write([]byte(`{"configs":[]}`))
+	}))
+	defer admin.Close()
+	for _, tc := range []struct {
+		name, option, want string
+	}{
+		{"omitted defaults off", "", "/config_dump"},
+		{"explicit off", `,"includeEds":false`, "/config_dump"},
+		{"enabled", `,"includeEds":true`, "/config_dump?include_eds"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `{"address":"` + admin.URL + `/config_dump?include_eds#ignored"` + tc.option + `}`
+			req := httptest.NewRequest(http.MethodPost, "/api/config", strings.NewReader(body))
+			res := httptest.NewRecorder()
+			newHandler(fstest.MapFS{}).ServeHTTP(res, req)
+			if res.Code != http.StatusOK || requested != tc.want {
+				t.Fatalf("status %d, upstream %q, want %q: %s", res.Code, requested, tc.want, res.Body.String())
+			}
+		})
 	}
 }

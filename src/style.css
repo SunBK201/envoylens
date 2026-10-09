@@ -941,6 +941,20 @@ textarea {
   width: 100%;
   padding: 13px;
 }
+.admin-eds-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.admin-eds-option input {
+  accent-color: var(--palette-177b64);
+}
+.admin-eds-option + .field-label {
+  margin-top: 14px;
+}
 .admin-form p {
   line-height: 1.8;
   margin: 18px 0;

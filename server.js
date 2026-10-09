@@ -23,7 +23,12 @@ export function createApp() {
     try {
       if (typeof req.body?.address !== "string")
         throw Error("Enter an Admin address");
-      url = adminURL(req.body.address);
+      if (
+        req.body.includeEds !== undefined &&
+        typeof req.body.includeEds !== "boolean"
+      )
+        throw Error("includeEds must be a boolean");
+      url = adminURL(req.body.address, req.body.includeEds);
     } catch (e) {
       return res.status(400).json({ error: e.message });
     }

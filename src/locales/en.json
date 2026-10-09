@@ -321,5 +321,7 @@
   "Incoming traffic (traffic_direction: INBOUND).": "Incoming traffic (traffic_direction: INBOUND).",
   "Outgoing traffic (traffic_direction: OUTBOUND).": "Outgoing traffic (traffic_direction: OUTBOUND).",
   "Traffic direction is unspecified; not inferred from the listener name or port.": "Traffic direction is unspecified; not inferred from the listener name or port.",
-  "Unrecognized traffic_direction: {0}": "Unrecognized traffic_direction: {0}"
+  "Unrecognized traffic_direction: {0}": "Unrecognized traffic_direction: {0}",
+  "Include EDS endpoints (include_eds)": "Include EDS endpoints (include_eds)",
+  "includeEds must be a boolean": "includeEds must be a boolean"
 }

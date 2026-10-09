@@ -326,5 +326,7 @@
   "Incoming traffic (traffic_direction: INBOUND).": "入站流量（traffic_direction: INBOUND）。",
   "Outgoing traffic (traffic_direction: OUTBOUND).": "出站流量（traffic_direction: OUTBOUND）。",
   "Traffic direction is unspecified; not inferred from the listener name or port.": "配置未指定流量方向，不根据 Listener 名称或端口推断。",
-  "Unrecognized traffic_direction: {0}": "无法识别的 traffic_direction：{0}"
+  "Unrecognized traffic_direction: {0}": "无法识别的 traffic_direction：{0}",
+  "Include EDS endpoints (include_eds)": "包含 EDS 端点（include_eds）",
+  "includeEds must be a boolean": "includeEds 必须是布尔值"
 }

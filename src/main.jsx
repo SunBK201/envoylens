@@ -160,6 +160,7 @@ function App() {
     [modal, setModal] = useState(false),
     [tab, setTab] = useState("paste"),
     [addressValue, setAddress] = useState("http://127.0.0.1:15000"),
+    [includeEds, setIncludeEds] = useState(false),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [selected, setSelected] = useState(null),
@@ -175,6 +176,7 @@ function App() {
     ),
     [auto, setAuto] = useState(false),
     [remote, setRemote] = useState(""),
+    [remoteIncludeEds, setRemoteIncludeEds] = useState(false),
     [updated, setUpdated] = useState(""),
     [copied, setCopied] = useState(false),
     [storageMessage, setStorageMessage] = useState("");
@@ -676,6 +678,7 @@ function App() {
         text: content,
         source: name,
         remote: options.remote || "",
+        includeEds: options.includeEds === true,
         savedAt,
       })
         .then(({ item, items }) => {
@@ -704,20 +707,22 @@ function App() {
       setError(e.message);
     }
   }
-  async function fetchAdmin(addr = addressValue) {
+  async function fetchAdmin(addr = addressValue, withEds = includeEds) {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
     setError("");
     const gen = ++generation.current;
     try {
-      const data = await fetchAdminConfig(addr);
+      const data = await fetchAdminConfig(addr, withEds);
       if (gen !== generation.current) return;
       install(data.text, addr, {
         remote: addr,
+        includeEds: withEds,
         preserveView: currentView.current.remote === addr,
       });
       setRemote(addr);
+      setRemoteIncludeEds(withEds);
     } catch (e) {
       if (gen === generation.current) {
         setError(e.message);
@@ -762,6 +767,8 @@ function App() {
           savedAt: saved.savedAt,
         });
         setRemote(typeof saved.remote === "string" ? saved.remote : "");
+        setRemoteIncludeEds(saved.includeEds === true);
+        setIncludeEds(saved.includeEds === true);
         if (saved.remote) setAddress(saved.remote);
         setAuto(false);
         setStorageMessage("Restored the last configuration (local snapshot)");
@@ -789,6 +796,8 @@ function App() {
       install(item.text, item.source, { restore: true, savedAt: item.savedAt });
       setActiveConfigId(id);
       setRemote(item.remote || "");
+      setRemoteIncludeEds(item.includeEds === true);
+      setIncludeEds(item.includeEds === true);
       if (item.remote) setAddress(item.remote);
 
       await activateConfig(id);
@@ -849,6 +858,7 @@ function App() {
           ...editing,
           name: editing.name.trim() || editing.source,
           remote: remoteAddress,
+          includeEds: editing.includeEds === true,
           savedAt: new Date().toISOString(),
         },
         { activate: isCurrent },
@@ -861,6 +871,8 @@ function App() {
           savedAt: item.savedAt,
         });
         setRemote(item.remote);
+        setRemoteIncludeEds(item.includeEds === true);
+        setIncludeEds(item.includeEds === true);
         if (item.remote) setAddress(item.remote);
       }
       setEditing(null);
@@ -881,9 +893,12 @@ function App() {
   }
   useEffect(() => {
     if (!auto || !remote) return;
-    const timer = setInterval(() => fetchAdmin(remote), 10000);
+    const timer = setInterval(
+      () => fetchAdmin(remote, remoteIncludeEds),
+      10000,
+    );
     return () => clearInterval(timer);
-  }, [auto, remote]);
+  }, [auto, remote, remoteIncludeEds]);
   async function upload(file) {
     if (!file) return;
     try {
@@ -1120,7 +1135,7 @@ function App() {
                     <button
                       title={t("Refresh Admin configuration")}
                       disabled={busy}
-                      onClick={() => fetchAdmin(remote)}
+                      onClick={() => fetchAdmin(remote, remoteIncludeEds)}
                     >
                       <RefreshCw size={15} />
                     </button>
@@ -2170,6 +2185,17 @@ function App() {
                     setEditing({ ...editing, remote: e.target.value })
                   }
                 />
+                <label className="admin-eds-option">
+                  <input
+                    type="checkbox"
+                    checked={editing.includeEds === true}
+                    disabled={savingEdit || !editing.remote?.trim()}
+                    onChange={(e) =>
+                      setEditing({ ...editing, includeEds: e.target.checked })
+                    }
+                  />
+                  {t("Include EDS endpoints (include_eds)")}
+                </label>
                 <label className="field-label" htmlFor="edit-config-text">
                   {t("Configuration")}
                   <span>JSON / YAML</span>
@@ -2294,9 +2320,22 @@ function App() {
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="http://127.0.0.1:15000"
                     />
+                    <label className="admin-eds-option">
+                      <input
+                        type="checkbox"
+                        checked={includeEds}
+                        disabled={busy}
+                        onChange={(e) => setIncludeEds(e.target.checked)}
+                      />
+                      {t("Include EDS endpoints (include_eds)")}
+                    </label>
                     <p>
                       {t("The server sends a read-only request to")}
-                      <code>/config_dump?include_eds</code>
+                      <code>
+                        {includeEds
+                          ? "/config_dump?include_eds"
+                          : "/config_dump"}
+                      </code>
                       {t(
                         ". Local and remote instances reachable from the server are supported. Auto-refresh is available after connecting.",
                       )}

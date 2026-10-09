@@ -49,7 +49,7 @@ func main() {
 	log.Fatal(server.ListenAndServe())
 }
 
-func adminURL(input string) (*url.URL, error) {
+func adminURL(input string, includeEds bool) (*url.URL, error) {
 	if !strings.Contains(input, "://") {
 		input = "http://" + input
 	}
@@ -60,7 +60,10 @@ func adminURL(input string) (*url.URL, error) {
 	if u.Path != "" && u.Path != "/" && u.Path != "/config_dump" {
 		return nil, fmt.Errorf("Address path must be / or /config_dump")
 	}
-	u.Path, u.RawPath, u.RawQuery, u.Fragment = "/config_dump", "", "include_eds", ""
+	u.Path, u.RawPath, u.RawQuery, u.Fragment, u.ForceQuery = "/config_dump", "", "", "", false
+	if includeEds {
+		u.RawQuery = "include_eds"
+	}
 	return u, nil
 }
 func jsonResponse(w http.ResponseWriter, status int, value any) {
@@ -96,13 +99,14 @@ func newHandler(frontend fs.FS) http.Handler {
 			return
 		}
 		var input struct {
-			Address string `json:"address"`
+			Address    string `json:"address"`
+			IncludeEds bool   `json:"includeEds"`
 		}
 		if json.Unmarshal(body, &input) != nil || strings.TrimSpace(input.Address) == "" {
 			fail(w, 400, "Enter a valid Admin address")
 			return
 		}
-		u, err := adminURL(input.Address)
+		u, err := adminURL(input.Address, input.IncludeEds)
 		if err != nil {
 			fail(w, 400, err.Error())
 			return

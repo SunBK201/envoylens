@@ -5,7 +5,7 @@ import { fetchAdminConfig } from "../src/admin-fetch.js";
 const dump = '{"configs":[]}';
 const proxied = {
   text: dump,
-  url: "http://admin:9901/config_dump?include_eds",
+  url: "http://admin:9901/config_dump",
 };
 
 test("direct Admin success does not call the backend", async (t) => {
@@ -48,7 +48,10 @@ for (const [name, direct] of [
       if (url !== "/api/config") return direct();
       assert.equal(options.method, "POST");
       assert.equal(options.headers["X-EnvoyLens"], "1");
-      assert.deepEqual(JSON.parse(options.body), { address: "admin:9901" });
+      assert.deepEqual(JSON.parse(options.body), {
+        address: "admin:9901",
+        includeEds: false,
+      });
       return Response.json(proxied);
     });
     assert.deepEqual(await fetchAdminConfig("admin:9901"), proxied);
@@ -103,3 +106,27 @@ test("invalid addresses do not trigger direct or backend requests", async (t) =>
     await assert.rejects(fetchAdminConfig(address));
   assert.equal(mock.mock.callCount(), 0);
 });
+
+for (const includeEds of [false, true]) {
+  test(`includeEds=${includeEds} controls direct and fallback requests`, async (t) => {
+    const url = `http://admin:9901/config_dump${includeEds ? "?include_eds" : ""}`;
+    let failDirect = false;
+    const mock = t.mock.method(globalThis, "fetch", async (target, options) => {
+      if (target === "/api/config") {
+        assert.deepEqual(JSON.parse(options.body), {
+          address: "admin:9901/config_dump?include_eds",
+          includeEds,
+        });
+        return Response.json({ text: dump, url });
+      }
+      assert.equal(target, url);
+      if (failDirect) throw new TypeError("Failed to fetch");
+      return new Response(dump);
+    });
+    const address = "admin:9901/config_dump?include_eds";
+    assert.equal((await fetchAdminConfig(address, includeEds)).url, url);
+    failDirect = true;
+    assert.equal((await fetchAdminConfig(address, includeEds)).url, url);
+    assert.equal(mock.mock.callCount(), 3);
+  });
+}

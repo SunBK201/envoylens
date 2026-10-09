@@ -9,7 +9,7 @@ const start = async (server) => {
 test("Admin URLs restrict scheme, credentials and path", () => {
   assert.equal(
     adminURL("localhost:9901").toString(),
-    "http://localhost:9901/config_dump?include_eds",
+    "http://localhost:9901/config_dump",
   );
   for (const u of [
     "file:///etc/passwd",
@@ -30,11 +30,11 @@ test("read-only Admin request and proxy protections", async (t) => {
   const server = createServer(createApp());
   const base = await start(server);
   t.after(() => server.close());
-  const call = (headers = {}, address = upstreamURL) =>
+  const call = (headers = {}, address = upstreamURL, includeEds) =>
     fetch(`${base}/api/config`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...headers },
-      body: JSON.stringify({ address }),
+      body: JSON.stringify({ address, includeEds }),
     });
   assert.equal((await call()).status, 403);
   assert.equal(
@@ -68,8 +68,30 @@ test("read-only Admin request and proxy protections", async (t) => {
   assert.equal((await res.json()).text, '{"configs":[]}');
   assert.deepEqual(requested, {
     method: "GET",
+    url: "/config_dump",
+  });
+  const enabled = await call({ "X-EnvoyLens": "1" }, upstreamURL, true);
+  assert.equal(enabled.status, 200);
+  assert.equal(
+    (await enabled.json()).url,
+    `${upstreamURL}/config_dump?include_eds`,
+  );
+  assert.deepEqual(requested, {
+    method: "GET",
     url: "/config_dump?include_eds",
   });
+  const disabled = await call(
+    { "X-EnvoyLens": "1" },
+    `${upstreamURL}/config_dump?include_eds`,
+    false,
+  );
+  assert.equal(disabled.status, 200);
+  assert.equal((await disabled.json()).url, `${upstreamURL}/config_dump`);
+  assert.deepEqual(requested, { method: "GET", url: "/config_dump" });
+  assert.equal(
+    (await call({ "X-EnvoyLens": "1" }, upstreamURL, "false")).status,
+    400,
+  );
 });
 test("Admin redirect and upstream failure return visible errors", async (t) => {
   const upstream = createServer((req, res) => {

@@ -1,8 +1,8 @@
 import { adminURL } from "./admin-url.js";
 
-export async function fetchAdminConfig(address) {
+export async function fetchAdminConfig(address, includeEds = false) {
   // Validate before either request; never probe arbitrary Admin paths.
-  const url = adminURL(address);
+  const url = adminURL(address, includeEds);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
@@ -30,7 +30,7 @@ export async function fetchAdminConfig(address) {
   const response = await fetch("/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-EnvoyLens": "1" },
-    body: JSON.stringify({ address }),
+    body: JSON.stringify({ address, includeEds }),
   });
   const data = await response.json();
   if (!response.ok) throw Error(data.error);
